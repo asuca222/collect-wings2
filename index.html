@@ -6,6 +6,9 @@
 <title>Collect Wings.</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Noto+Sans+JP:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 <style>
 :root[data-theme="dark"]{
   --bg:#0a0a0c;--bg2:#111114;--bg3:#18181d;--bg4:#22222a;
@@ -365,15 +368,24 @@ nav{padding:6px 0;flex:1;}
     <div class="ni" id="ni-xr" onclick="sw('xr')"><svg class="nico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="1" y="5" width="14" height="8" rx="2"/><circle cx="5.5" cy="9" r="1.5"/><path d="M10 9h3M10 11.5h2"/></svg>XR公演</div>
     <div class="ns">管理</div>
     <div class="ni" id="ni-att" onclick="sw('att')"><svg class="nico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="1" y="2" width="14" height="12" rx="1.5"/><path d="M5 6h6M5 9h4M5 12h3"/></svg>出欠一覧</div>
-    <div class="ni" id="ni-stat" onclick="sw('stat')"><svg class="nico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2 12V8h3v4H2zM6.5 12V5h3v7h-3zM11 12V2h3v10h-3z"/></svg>統計</div>
-    <div class="ni" id="ni-lib" onclick="sw('lib')"><svg class="nico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2 2h5v12H2zM9 2h5v12H9z"/></svg>楽曲を追加<span class="nbadge" id="b-lib">0</span></div>
+
+    <div class="ni" id="ni-lib" onclick="reqAdmin(()=>sw('lib'))"><svg class="nico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2 2h5v12H2zM9 2h5v12H9z"/></svg>楽曲を追加<span class="nbadge" id="b-lib">0</span></div>
     <div class="ni" id="ni-sched" onclick="sw('sched')"><svg class="nico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2" y="2" width="12" height="12" rx="1.5"/><path d="M5 1v2M11 1v2M2 6h12"/></svg>スケジュール<span class="nbadge" id="b-sched">0</span></div>
     <!-- 公演を追加はトップバーボタンのみ -->
   </nav>
   <div class="sb-bot">
+    <!-- 管理者バッジ（ログイン時のみ表示） -->
+    <div id="admin-badge" style="display:none;align-items:center;gap:6px;padding:5px 14px;font-size:10px;color:var(--accent);font-family:'DM Mono',monospace;border-bottom:1px solid var(--line);">
+      <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1l2 4h4l-3 3 1 4-4-2.5L4 12l1-4L2 5h4z"/></svg>
+      ADMIN MODE
+    </div>
+    <button id="admin-logout-btn" class="sbbtn" style="display:none;color:var(--rt);font-size:11px;" onclick="adminLogout()">
+      <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 3H3a1 1 0 00-1 1v8a1 1 0 001 1h3M10 11l3-3-3-3M13 8H6"/></svg>
+      管理者ログアウト
+    </button>
     <button class="sbbtn" onclick="sw('tips')"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="6.5"/><path d="M8 7v5M8 5v.5"/></svg>Tips</button>
     <button class="sbbtn" id="cm-btn" onclick="tgCast()"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="5" r="3"/><path d="M2 14c0-3.3 2.7-6 6-6s6 2.7 6 6"/></svg><span id="cm-lbl">キャスト名表示</span></button>
-    <button class="tbtn" onclick="openSettings()" style="margin-bottom:2px;"><svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.22 3.22l1.42 1.42M11.36 11.36l1.42 1.42M3.22 12.78l1.42-1.42M11.36 4.64l1.42-1.42"/></svg>⚙ Settings</button>
+    <button class="tbtn" onclick="reqAdmin(openSettings)" style="margin-bottom:2px;"><svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.22 3.22l1.42 1.42M11.36 11.36l1.42 1.42M3.22 12.78l1.42-1.42M11.36 4.64l1.42-1.42"/></svg>⚙ Settings</button>
     <button class="tbtn" onclick="tgTheme()"><svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="4"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.5 3.5l1.4 1.4M11.1 11.1l1.4 1.4M3.5 12.5l1.4-1.4M11.1 4.9l1.4-1.4"/></svg><span id="tl">ライトモード</span></button>
     <div class="leg">
       <div class="lrow"><div class="ldot" style="background:var(--ct)"></div><span style="font-size:10px;color:var(--text3)">キャスト</span></div>
@@ -390,7 +402,7 @@ nav{padding:6px 0;flex:1;}
 <main class="main">
   <div class="topbar">
     <div class="ptitle" id="ptitle">楽曲から検索</div>
-    <button class="btn btn-a btn-sm" id="topbar-btn" onclick="sw('add')">＋ 公演を追加</button>
+    <button class="btn btn-a btn-sm" id="topbar-btn" onclick="reqAdmin(()=>sw('add'))">＋ 公演を追加</button>
   </div>
   <div class="content">
 
@@ -575,6 +587,80 @@ nav{padding:6px 0;flex:1;}
   </div>
 </main>
 
+<!-- Admin Auth Modal -->
+<div id="admin-modal" style="display:none;position:fixed;inset:0;z-index:9500;background:rgba(0,0,0,.65);align-items:center;justify-content:center;padding:20px;">
+  <div style="background:var(--bg2);border:1px solid var(--line2);border-radius:14px;width:min(360px,95vw);overflow:hidden;">
+    <div style="padding:16px 20px 12px;border-bottom:1px solid var(--line);">
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:.1em;color:var(--accent);" id="admin-modal-title">管理者認証</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:3px;line-height:1.6;" id="admin-modal-desc"></div>
+    </div>
+    <div style="padding:16px 20px;">
+      <label style="display:block;font-size:9px;color:var(--text3);letter-spacing:.12em;text-transform:uppercase;margin-bottom:5px;font-family:'DM Mono',monospace;">PASSWORD</label>
+      <input id="admin-pw-inp" type="password" autocomplete="current-password" placeholder="••••••••" style="width:100%;padding:8px 10px;font-size:14px;background:var(--ibg);border:1px solid var(--line2);border-radius:6px;color:var(--text);outline:none;margin-bottom:10px;font-family:'DM Mono',monospace;">
+      <div id="admin-modal-msg" style="font-size:11px;min-height:16px;margin-bottom:10px;"></div>
+      <div style="display:flex;gap:8px;">
+        <button id="admin-confirm-btn" style="flex:1;padding:8px;font-size:12px;background:var(--accent);border:none;border-radius:6px;color:#fff;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">確認</button>
+        <button onclick="_closeAdminModal()" style="padding:8px 14px;font-size:12px;background:transparent;border:1px solid var(--line2);border-radius:6px;color:var(--text2);cursor:pointer;font-family:'Noto Sans JP',sans-serif;">キャンセル</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Firebase Setup Modal -->
+<div id="fb-setup-modal" style="display:flex;position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.75);align-items:center;justify-content:center;padding:20px;">
+  <div style="background:var(--bg2);border:1px solid var(--line2);border-radius:14px;width:min(520px,95vw);max-height:90vh;display:flex;flex-direction:column;overflow:hidden;">
+    <div style="padding:16px 20px 12px;border-bottom:1px solid var(--line);flex-shrink:0;">
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:.1em;color:var(--accent);margin-bottom:4px;">🔥 Firebase 設定</div>
+      <div style="font-size:11px;color:var(--text3);line-height:1.7;">Realtime Database でデータを同期します。Firebase Console でプロジェクトを作成し、設定情報を入力してください。</div>
+    </div>
+    <div style="overflow-y:auto;flex:1;padding:16px 20px;">
+      <div style="background:var(--bg3);border:1px solid var(--line2);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:10px;color:var(--text3);line-height:1.8;">
+        <b style="color:var(--ct);">設定手順</b><br>
+        1. <a href="https://console.firebase.google.com" target="_blank" style="color:var(--ct);">Firebase Console</a> でプロジェクトを作成<br>
+        2. Realtime Database を作成（テストモードで開始）<br>
+        3. プロジェクト設定 → 「アプリを追加」→ Web アプリ<br>
+        4. 表示された設定値をコピーして以下に貼り付け
+      </div>
+      <div style="margin-bottom:10px;">
+        <label style="display:block;font-size:9px;color:var(--text3);letter-spacing:.12em;text-transform:uppercase;margin-bottom:3px;font-family:'DM Mono',monospace;">API Key</label>
+        <input id="fb-apiKey" type="text" placeholder="AIzaSy..." style="width:100%;padding:7px 10px;font-size:12px;background:var(--ibg);border:1px solid var(--line2);border-radius:6px;color:var(--text);font-family:'DM Mono',monospace;outline:none;">
+      </div>
+      <div style="margin-bottom:10px;">
+        <label style="display:block;font-size:9px;color:var(--text3);letter-spacing:.12em;text-transform:uppercase;margin-bottom:3px;font-family:'DM Mono',monospace;">Auth Domain</label>
+        <input id="fb-authDomain" type="text" placeholder="your-project.firebaseapp.com" style="width:100%;padding:7px 10px;font-size:12px;background:var(--ibg);border:1px solid var(--line2);border-radius:6px;color:var(--text);font-family:'DM Mono',monospace;outline:none;">
+      </div>
+      <div style="margin-bottom:10px;">
+        <label style="display:block;font-size:9px;color:var(--text3);letter-spacing:.12em;text-transform:uppercase;margin-bottom:3px;font-family:'DM Mono',monospace;">Database URL <span style="color:var(--rt);">*必須</span></label>
+        <input id="fb-databaseURL" type="text" placeholder="https://your-project-default-rtdb.firebaseio.com" style="width:100%;padding:7px 10px;font-size:12px;background:var(--ibg);border:1px solid var(--line2);border-radius:6px;color:var(--text);font-family:'DM Mono',monospace;outline:none;">
+      </div>
+      <div style="margin-bottom:10px;">
+        <label style="display:block;font-size:9px;color:var(--text3);letter-spacing:.12em;text-transform:uppercase;margin-bottom:3px;font-family:'DM Mono',monospace;">Project ID</label>
+        <input id="fb-projectId" type="text" placeholder="your-project-id" style="width:100%;padding:7px 10px;font-size:12px;background:var(--ibg);border:1px solid var(--line2);border-radius:6px;color:var(--text);font-family:'DM Mono',monospace;outline:none;">
+      </div>
+      <div style="margin-bottom:10px;">
+        <label style="display:block;font-size:9px;color:var(--text3);letter-spacing:.12em;text-transform:uppercase;margin-bottom:3px;font-family:'DM Mono',monospace;">Storage Bucket</label>
+        <input id="fb-storageBucket" type="text" placeholder="your-project.appspot.com" style="width:100%;padding:7px 10px;font-size:12px;background:var(--ibg);border:1px solid var(--line2);border-radius:6px;color:var(--text);font-family:'DM Mono',monospace;outline:none;">
+      </div>
+      <div style="margin-bottom:10px;">
+        <label style="display:block;font-size:9px;color:var(--text3);letter-spacing:.12em;text-transform:uppercase;margin-bottom:3px;font-family:'DM Mono',monospace;">Messaging Sender ID</label>
+        <input id="fb-messagingSenderId" type="text" placeholder="123456789" style="width:100%;padding:7px 10px;font-size:12px;background:var(--ibg);border:1px solid var(--line2);border-radius:6px;color:var(--text);font-family:'DM Mono',monospace;outline:none;">
+      </div>
+      <div style="margin-bottom:16px;">
+        <label style="display:block;font-size:9px;color:var(--text3);letter-spacing:.12em;text-transform:uppercase;margin-bottom:3px;font-family:'DM Mono',monospace;">App ID</label>
+        <input id="fb-appId" type="text" placeholder="1:123456789:web:abc..." style="width:100%;padding:7px 10px;font-size:12px;background:var(--ibg);border:1px solid var(--line2);border-radius:6px;color:var(--text);font-family:'DM Mono',monospace;outline:none;">
+      </div>
+      <div id="fb-setup-msg" style="font-size:11px;margin-bottom:10px;min-height:16px;"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button onclick="fbSaveConfig()" style="padding:8px 18px;font-size:12px;background:var(--accent);border:none;border-radius:6px;color:#fff;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">接続して保存</button>
+        <button onclick="fbSkipSetup()" style="padding:8px 14px;font-size:12px;background:transparent;border:1px solid var(--line2);border-radius:6px;color:var(--text2);cursor:pointer;font-family:'Noto Sans JP',sans-serif;">後で設定（ローカルのみ）</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Firebase Status Bar -->
+<div id="fb-status-bar" style="display:none;position:fixed;top:0;left:0;right:0;z-index:8000;padding:5px 16px;font-size:11px;font-family:'DM Mono',monospace;text-align:center;pointer-events:none;"></div>
+
 <!-- Settings Modal -->
 <div class="settings-modal" id="settings-modal" onclick="if(event.target===this)closeSettings()">
   <div class="settings-box" style="max-width:520px;">
@@ -586,6 +672,7 @@ nav{padding:6px 0;flex:1;}
     <div style="display:flex;border-bottom:1px solid var(--line);flex-shrink:0;">
       <button id="stab-hist" onclick="sSettings('hist')" style="flex:1;padding:8px 6px;font-size:11px;background:transparent;border:none;border-bottom:2px solid var(--accent);color:var(--accent);cursor:pointer;font-family:'Noto Sans JP',sans-serif;transition:all .15s;">削除履歴</button>
       <button id="stab-imp" onclick="sSettings('imp')" style="flex:1;padding:8px 6px;font-size:11px;background:transparent;border:none;border-bottom:2px solid transparent;color:var(--text2);cursor:pointer;font-family:'Noto Sans JP',sans-serif;transition:all .15s;">データ移植</button>
+      <button id="stab-pw" onclick="sSettings('pw')" style="flex:1;padding:8px 6px;font-size:11px;background:transparent;border:none;border-bottom:2px solid transparent;color:var(--text2);cursor:pointer;font-family:'Noto Sans JP',sans-serif;transition:all .15s;">パスワード</button>
     </div>
     <div class="settings-body" id="settings-body"></div>
     <div class="settings-body" id="settings-imp-body" style="display:none;">
@@ -604,6 +691,20 @@ nav{padding:6px 0;flex:1;}
         <div style="font-size:10px;color:var(--text3);margin-bottom:7px;">または — 現在のデータをJSONでエクスポート（バックアップ用）</div>
         <button class="btn btn-sm" onclick="doExport()">📥 エクスポート</button>
       </div>
+    </div>
+    <!-- パスワード変更タブ -->
+    <div class="settings-body" id="settings-pw-body" style="display:none;">
+      <div style="font-size:11px;color:var(--text3);margin-bottom:14px;line-height:1.7;">管理者パスワードを変更します。変更後は現在のセッションも含め再認証が必要になります。</div>
+      <div style="margin-bottom:10px;">
+        <label style="display:block;font-size:9px;color:var(--text3);letter-spacing:.12em;text-transform:uppercase;margin-bottom:4px;font-family:'DM Mono',monospace;">新しいパスワード（4文字以上）</label>
+        <input id="pw-new" type="password" placeholder="••••••••" style="width:100%;padding:7px 10px;font-size:13px;background:var(--ibg);border:1px solid var(--line2);border-radius:6px;color:var(--text);font-family:'DM Mono',monospace;outline:none;">
+      </div>
+      <div style="margin-bottom:14px;">
+        <label style="display:block;font-size:9px;color:var(--text3);letter-spacing:.12em;text-transform:uppercase;margin-bottom:4px;font-family:'DM Mono',monospace;">確認（もう一度）</label>
+        <input id="pw-new2" type="password" placeholder="••••••••" style="width:100%;padding:7px 10px;font-size:13px;background:var(--ibg);border:1px solid var(--line2);border-radius:6px;color:var(--text);font-family:'DM Mono',monospace;outline:none;">
+      </div>
+      <div id="pw-change-msg" style="font-size:11px;min-height:16px;margin-bottom:10px;"></div>
+      <button class="btn btn-a" onclick="adminChangePw()">パスワードを変更</button>
     </div>
   </div>
 </div>
@@ -792,8 +893,8 @@ function clMob(){document.getElementById('sb').classList.remove('mo');document.g
 // ═══════════════════════════════════════════
 // TAB SWITCHING
 // ═══════════════════════════════════════════
-const ATS=['songs','cons','cast','xr','att','stat','lib','sched','add','tips'];
-const PT={songs:'楽曲から検索',cons:'公演一覧',cast:'キャスト公演',xr:'XR公演',att:'出欠一覧',stat:'統計',lib:'楽曲を追加',sched:'スケジュール',add:'公演を追加',tips:'Tips'};
+const ATS=['songs','cons','cast','xr','att','lib','sched','add','tips'];
+const PT={songs:'楽曲から検索',cons:'公演一覧',cast:'キャスト公演',xr:'XR公演',att:'出欠一覧',lib:'楽曲を追加',sched:'スケジュール',add:'公演を追加',tips:'Tips'};
 function sw(t){
   // warn if bulk textarea has unsaved content
   if(curTab==='add'&&t!=='add'){
@@ -808,15 +909,15 @@ function sw(t){
   document.querySelectorAll('.panel').forEach(e=>e.classList.remove('active'));
   const p=document.getElementById('panel-'+t);if(p)p.classList.add('active');
   document.getElementById('ptitle').textContent=PT[t]||t;
-  // トップバーボタン：公演を追加ページのみ「保存する」
+  // トップバーボタン
   const topBtn=document.getElementById('topbar-btn');
   if(topBtn){
     if(t==='add'){topBtn.textContent='保存する';topBtn.onclick=()=>saveCon();}
-    else{topBtn.textContent='＋ 公演を追加';topBtn.onclick=()=>sw('add');}
+    else{topBtn.textContent='＋ 公演を追加';topBtn.onclick=()=>reqAdmin(()=>sw('add'));}
   }
   clMob();rCur();
 }
-function rCur(){if(curTab==='songs')rSongs();else if(curTab==='cons')rCons();else if(curTab==='cast')rPP('cast');else if(curTab==='xr')rPP('xr');else if(curTab==='att')rAtt();else if(curTab==='stat')rStat();else if(curTab==='lib')rLib();else if(curTab==='sched')rSched();else if(curTab==='tips')rTips();updB();}
+function rCur(){if(curTab==='songs')rSongs();else if(curTab==='cons')rCons();else if(curTab==='cast')rPP('cast');else if(curTab==='xr')rPP('xr');else if(curTab==='att')rAtt();else if(curTab==='lib')rLib();else if(curTab==='sched')rSched();else if(curTab==='tips')rTips();updB();}
 function updB(){document.getElementById('b-songs').textContent=Object.keys(bSM()).length;document.getElementById('b-cons').textContent=cons.length;document.getElementById('b-lib').textContent=lib.length;document.getElementById('b-sched').textContent=schs.length;}
 
 // ═══════════════════════════════════════════
@@ -1321,7 +1422,7 @@ function rAtt(){
 const VCAP_KEY='cw_vcap_v1';
 let venueCap={};
 // venueCap の読み込みは INIT ブロック内の _lsGet が使えるタイミングで行う
-function saveVCap(){if(typeof _lsSet==='function')_lsSet(VCAP_KEY,JSON.stringify(venueCap));}
+// saveVCap は Firebase統合ブロックで定義
 
 // チップ表示モード: 'unit'|'individual'|'all'
 let chipMode='unit';
@@ -1694,7 +1795,7 @@ function rCP(){
 }
 function tgCP(k,col,btn){cPres[k]=!cPres[k];btn.classList.toggle('p',cPres[k]);if(cPres[k]){btn.style.background=col;btn.style.color=cc(col);btn.querySelector('.ccdot').style.background='rgba(0,0,0,.3)';}else{btn.style.background='';btn.style.color='';btn.querySelector('.ccdot').style.background=col;}}
 function setCPM(m){cpMode=m;document.getElementById('cp-ch').classList.toggle('on',m==='chara');document.getElementById('cp-ca').classList.toggle('on',m==='cast');rCP();}
-function cpSelAll(v){MBR.filter(m=>m.u!=='other').forEach(m=>{cPres[m.ch]=v;});rCP();}
+function cpSelAll(v){MBR.filter(m=>UORDER.includes(m.u)).forEach(m=>{cPres[m.ch]=v;});rCP();}
 function cpToggleUnit(uid){
   const ms=MBR.filter(m=>m.u===uid);const allOn=ms.every(m=>cPres[m.ch]);ms.forEach(m=>{cPres[m.ch]=!allOn;});rCP();}
 
@@ -1874,12 +1975,27 @@ function _loadHist(){try{const r=_lsGet(HIST_KEY);if(r)delHist=JSON.parse(r)||[]
 function _saveHist(){try{_lsSet(HIST_KEY,JSON.stringify(delHist.slice(0,300)));}catch(e){}}
 function _pushHist(type,item){delHist.unshift({type,item,ts:new Date().toISOString()});_saveHist();}
 function sSettings(tab){
-  ['hist','imp'].forEach(t=>{
+  ['hist','imp','pw'].forEach(t=>{
     const btn=document.getElementById('stab-'+t);
     if(btn){btn.style.borderBottom=t===tab?'2px solid var(--accent)':'2px solid transparent';btn.style.color=t===tab?'var(--accent)':'var(--text2)';}
   });
   document.getElementById('settings-body').style.display=tab==='hist'?'':'none';
   document.getElementById('settings-imp-body').style.display=tab==='imp'?'':'none';
+  const pwBody=document.getElementById('settings-pw-body');
+  if(pwBody)pwBody.style.display=tab==='pw'?'':'none';
+}
+function adminChangePw(){
+  const p1=document.getElementById('pw-new').value;
+  const p2=document.getElementById('pw-new2').value;
+  const msg=document.getElementById('pw-change-msg');
+  if(p1.length<4){msg.style.color='var(--rt)';msg.textContent='4文字以上で設定してください';return;}
+  if(p1!==p2){msg.style.color='var(--rt)';msg.textContent='パスワードが一致しません';return;}
+  adminSetPassword(p1).then(()=>{
+    msg.style.color='var(--gt)';msg.textContent='変更しました！';
+    document.getElementById('pw-new').value='';
+    document.getElementById('pw-new2').value='';
+    setTimeout(()=>{msg.textContent='';},2000);
+  });
 }
 function openSettings(){_loadHist();rSettings();document.getElementById('settings-modal').classList.add('open');sSettings('hist');}
 function closeSettings(){document.getElementById('settings-modal').classList.remove('open');}
@@ -1946,121 +2062,350 @@ function delCon(id){
 }
 
 // ═══════════════════════════════════════════
-// INIT — 全関数定義の後でデータ読み込み・起動
+// 管理者認証システム
 // ═══════════════════════════════════════════
+const ADMIN_PW_KEY='cw_admin_pw';   // localStorage に保存するハッシュ用キー
+const ADMIN_SESSION_KEY='cw_admin_session'; // セッション中の認証フラグ
+let _adminAuthed=false;             // セッション内フラグ
+
+// パスワードが未設定か確認
+function adminHasPassword(){
+  return !!_lsGet(ADMIN_PW_KEY);
+}
+// 簡易ハッシュ（設定保存用。高セキュリティ用途ではないが難読化として機能）
+async function _hashPw(pw){
+  const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('cw_salt_'+pw));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+// 管理者パスワードを設定（初回）
+async function adminSetPassword(pw){
+  const h=await _hashPw(pw);
+  _lsSet(ADMIN_PW_KEY,h);
+  _adminAuthed=true;
+}
+// 認証チェック
+async function adminCheck(pw){
+  const stored=_lsGet(ADMIN_PW_KEY);
+  if(!stored)return false;
+  const h=await _hashPw(pw);
+  return h===stored;
+}
+
+// 認証モーダルを表示し、成功したら callback 実行
+function reqAdmin(callback){
+  if(_adminAuthed){callback();return;}
+  // パスワード未設定なら初回設定モーダル
+  if(!adminHasPassword()){_showAdminSetup(callback);return;}
+  _showAdminLogin(callback);
+}
+
+function _showAdminLogin(callback){
+  const modal=document.getElementById('admin-modal');
+  document.getElementById('admin-modal-title').textContent='管理者認証';
+  document.getElementById('admin-modal-desc').textContent='管理者パスワードを入力してください';
+  document.getElementById('admin-pw-inp').value='';
+  document.getElementById('admin-modal-msg').textContent='';
+  document.getElementById('admin-confirm-btn').onclick=async()=>{
+    const pw=document.getElementById('admin-pw-inp').value;
+    const ok=await adminCheck(pw);
+    if(ok){
+      _adminAuthed=true;
+      _closeAdminModal();
+      _applyAdminUI();
+      callback();
+    } else {
+      document.getElementById('admin-modal-msg').style.color='var(--rt)';
+      document.getElementById('admin-modal-msg').textContent='パスワードが正しくありません';
+      document.getElementById('admin-pw-inp').select();
+    }
+  };
+  document.getElementById('admin-pw-inp').onkeydown=e=>{if(e.key==='Enter')document.getElementById('admin-confirm-btn').click();};
+  modal.style.display='flex';
+  setTimeout(()=>document.getElementById('admin-pw-inp').focus(),80);
+}
+
+function _showAdminSetup(callback){
+  const modal=document.getElementById('admin-modal');
+  document.getElementById('admin-modal-title').textContent='管理者パスワードを設定';
+  document.getElementById('admin-modal-desc').textContent='初回設定です。管理者パスワードを決めてください（後から変更可）';
+  document.getElementById('admin-pw-inp').value='';
+  document.getElementById('admin-modal-msg').textContent='';
+  document.getElementById('admin-confirm-btn').onclick=async()=>{
+    const pw=document.getElementById('admin-pw-inp').value.trim();
+    if(pw.length<4){
+      document.getElementById('admin-modal-msg').style.color='var(--rt)';
+      document.getElementById('admin-modal-msg').textContent='4文字以上で設定してください';
+      return;
+    }
+    await adminSetPassword(pw);
+    _closeAdminModal();
+    _applyAdminUI();
+    callback();
+  };
+  document.getElementById('admin-pw-inp').onkeydown=e=>{if(e.key==='Enter')document.getElementById('admin-confirm-btn').click();};
+  modal.style.display='flex';
+  setTimeout(()=>document.getElementById('admin-pw-inp').focus(),80);
+}
+
+function _closeAdminModal(){
+  document.getElementById('admin-modal').style.display='none';
+}
+
+// 管理者ログイン後のUI変更（ロック解除表示など）
+function _applyAdminUI(){
+  // サイドバーの「管理者」バッジ表示
+  const badge=document.getElementById('admin-badge');
+  if(badge)badge.style.display='flex';
+  // ログアウトボタン表示
+  const logoutBtn=document.getElementById('admin-logout-btn');
+  if(logoutBtn)logoutBtn.style.display='flex';
+}
+
+// 管理者ログアウト
+function adminLogout(){
+  if(!confirm('管理者モードを終了しますか？'))return;
+  _adminAuthed=false;
+  const badge=document.getElementById('admin-badge');if(badge)badge.style.display='none';
+  const logoutBtn=document.getElementById('admin-logout-btn');if(logoutBtn)logoutBtn.style.display='none';
+  // 管理者ページにいたら戻す
+  if(curTab==='add'||curTab==='lib')sw('songs');
+}
+
+// ── Firebase統合ブロック ──────────────────────
+// ═══════════════════════════════════════════
+// FIREBASE REALTIME DATABASE 統合
+// ═══════════════════════════════════════════
+const FB_CONFIG_KEY='cw_fb_config';
+let _fbDb=null;
+let _fbUid='local'; // デバイスUID（共有用）
+let _fbWriteDebounce={};
+
+// ── localStorage ヘルパー（設定保存用・フォールバック用） ──
 (function(){
-  // ── localStorage 可用性チェック ──────────────
   let avail=false;
   try{localStorage.setItem('_cw_test','1');localStorage.removeItem('_cw_test');avail=true;}catch(e){}
   window._lsAvail=avail;
+  window._lsGet=function(key){if(!avail)return null;try{return localStorage.getItem(key);}catch(e){return null;}};
+  window._lsSet=function(key,val){if(!avail)return false;try{localStorage.setItem(key,val);return true;}catch(e){return false;}};
+})();
 
-  // ── 読み込みヘルパー ─────────────────────────
-  window._lsGet=function(key){
-    if(!avail)return null;
-    try{return localStorage.getItem(key);}catch(e){return null;}
-  };
-
-  // ── 書き込みヘルパー ─────────────────────────
-  window._lsSet=function(key,val){
-    if(!avail){
-      if(!document._noLsWarn){
-        document._noLsWarn=true;
-        console.warn('localStorage unavailable');
-      }
-      return false;
-    }
-    try{localStorage.setItem(key,val);return true;}
-    catch(e){
-      console.error('localStorage save error',key,e);
-      if(!document._saveWarnShown){
-        document._saveWarnShown=true;
-        setTimeout(()=>{document._saveWarnShown=false;},8000);
-        const t=document.getElementById('_save-toast');
-        if(t){t.style.background='rgba(163,45,45,.95)';t.style.color='#fff';t.textContent='⚠ 保存に失敗しました（容量不足の可能性があります）';t.style.opacity='1';setTimeout(()=>{t.style.opacity='0';},5000);}
-      }
-      return false;
-    }
-  };
-
-  // ── saveトースト要素を body に注入 ───────────
+// ── トースト ────────────────────────────────
+(function(){
   const toast=document.createElement('div');
   toast.id='_save-toast';
   toast.style.cssText='position:fixed;bottom:16px;right:16px;z-index:9999;padding:7px 14px;border-radius:8px;font-size:11px;font-family:"Noto Sans JP",sans-serif;font-weight:500;pointer-events:none;transition:opacity .4s;opacity:0;';
   document.body.appendChild(toast);
+})();
+function _toast(msg,color='rgba(45,158,110,.92)'){
+  const t=document.getElementById('_save-toast');
+  if(!t)return;
+  clearTimeout(t._tid);
+  t.style.background=color;t.style.color='#fff';t.textContent=msg;t.style.opacity='1';
+  t._tid=setTimeout(()=>{t.style.opacity='0';},1400);
+}
 
-  // ── save 関数定義 ────────────────────────────
-  window.saveC=function(){
-    const ok=_lsSet(SK,JSON.stringify(cons));
-    if(ok){const t=document.getElementById('_save-toast');if(t){clearTimeout(t._tid);t.style.background='rgba(45,158,110,.92)';t.style.color='#fff';t.textContent='✓ 保存しました';t.style.opacity='1';t._tid=setTimeout(()=>{t.style.opacity='0';},1400);}}
+// ── Firebase 設定 UI ─────────────────────────
+function fbShowStatus(msg,color='var(--ct)'){
+  const bar=document.getElementById('fb-status-bar');
+  if(!bar)return;
+  bar.style.background=color==='ok'?'rgba(45,158,110,.9)':color==='err'?'rgba(163,45,45,.9)':'rgba(30,30,40,.9)';
+  bar.style.color='#fff';
+  bar.textContent=msg;
+  bar.style.display='block';
+  clearTimeout(bar._tid);
+  if(color==='ok')bar._tid=setTimeout(()=>{bar.style.display='none';},2500);
+}
+
+function fbLoadConfig(){
+  try{const s=_lsGet(FB_CONFIG_KEY);return s?JSON.parse(s):null;}catch(e){return null;}
+}
+function fbSaveConfig(){
+  const cfg={
+    apiKey:document.getElementById('fb-apiKey').value.trim(),
+    authDomain:document.getElementById('fb-authDomain').value.trim(),
+    databaseURL:document.getElementById('fb-databaseURL').value.trim(),
+    projectId:document.getElementById('fb-projectId').value.trim(),
+    storageBucket:document.getElementById('fb-storageBucket').value.trim(),
+    messagingSenderId:document.getElementById('fb-messagingSenderId').value.trim(),
+    appId:document.getElementById('fb-appId').value.trim(),
   };
-  window.saveL=function(){_lsSet(LK,JSON.stringify(lib));};
-  window.saveS=function(){_lsSet(SCHK,JSON.stringify(schs));};
+  if(!cfg.databaseURL){
+    const m=document.getElementById('fb-setup-msg');
+    m.style.color='var(--rt)';m.textContent='Database URL は必須です';return;
+  }
+  _lsSet(FB_CONFIG_KEY,JSON.stringify(cfg));
+  document.getElementById('fb-setup-msg').style.color='var(--gt)';
+  document.getElementById('fb-setup-msg').textContent='接続中...';
+  fbInit(cfg,true);
+}
+function fbSkipSetup(){
+  document.getElementById('fb-setup-modal').style.display='none';
+  fbRunLocalMode();
+}
+function fbFillSetupForm(cfg){
+  ['apiKey','authDomain','databaseURL','projectId','storageBucket','messagingSenderId','appId'].forEach(k=>{
+    const el=document.getElementById('fb-'+k);if(el&&cfg[k])el.value=cfg[k];
+  });
+}
 
-  // ── データ読み込み ───────────────────────────
+// ── Firebase 初期化 ──────────────────────────
+function fbInit(cfg,fromSetup=false){
+  try{
+    if(firebase.apps.length)firebase.apps.forEach(a=>a.delete());
+    firebase.initializeApp(cfg);
+    _fbDb=firebase.database();
+    // 接続テスト
+    _fbDb.ref('.info/connected').on('value',snap=>{
+      if(snap.val()===true){
+        if(fromSetup){
+          document.getElementById('fb-setup-modal').style.display='none';
+          fbShowStatus('🔥 Firebase 接続済み',color='ok');
+        }
+        fbStartSync();
+      }
+    });
+  }catch(e){
+    console.error('Firebase init error',e);
+    if(fromSetup){
+      const m=document.getElementById('fb-setup-msg');
+      m.style.color='var(--rt)';m.textContent='接続失敗: '+e.message;
+    }
+    fbRunLocalMode();
+  }
+}
+
+// ── Firebase → ローカル変数 同期 ────────────
+function fbStartSync(){
+  const ref=_fbDb.ref('cw');
+  ref.on('value',snap=>{
+    const data=snap.val()||{};
+    const newCons=Array.isArray(data.cons)?data.cons.map(mgC):[];
+    const newLib=Array.isArray(data.lib)?data.lib:[];
+    const newSchs=Array.isArray(data.schs)?data.schs:[];
+    const newVCap=(data.vcap&&typeof data.vcap==='object')?data.vcap:{};
+    const newHist=Array.isArray(data.hist)?data.hist:[];
+    cons=newCons;lib=newLib;schs=newSchs;venueCap=newVCap;delHist=newHist;
+    _autoCleanSchs();
+    rCur();updB();
+    _loadHistUI();
+    fbShowStatus('🔄 同期完了','ok');
+  },err=>{
+    console.error('Firebase read error',err);
+    fbShowStatus('⚠ 同期エラー: '+err.message,'err');
+  });
+}
+
+// ── Firebase 書き込みヘルパー（デバウンス付き） ──
+function fbWrite(path,data,debounceMs=800){
+  if(!_fbDb){_lsSet(path,JSON.stringify(data));return;}
+  clearTimeout(_fbWriteDebounce[path]);
+  _fbWriteDebounce[path]=setTimeout(()=>{
+    _fbDb.ref('cw/'+path).set(data)
+      .then(()=>fbShowStatus('✓ 保存しました','ok'))
+      .catch(e=>{fbShowStatus('⚠ 保存失敗: '+e.message,'err');});
+  },debounceMs);
+}
+
+// ── save 関数定義 ─────────────────────────────
+window.saveC=function(){
+  if(_fbDb){fbWrite('cons',cons);}
+  else{_lsSet(SK,JSON.stringify(cons));}
+  _toast('✓ 保存しました');
+};
+window.saveL=function(){
+  if(_fbDb){fbWrite('lib',lib);}
+  else{_lsSet(LK,JSON.stringify(lib));}
+};
+window.saveS=function(){
+  if(_fbDb){fbWrite('schs',schs);}
+  else{_lsSet(SCHK,JSON.stringify(schs));}
+};
+window.saveVCap=function(){
+  if(_fbDb){fbWrite('vcap',venueCap,400);}
+  else{_lsSet(VCAP_KEY,JSON.stringify(venueCap));}
+};
+window._saveHist=function(){
+  const h=delHist.slice(0,300);
+  if(_fbDb){fbWrite('hist',h,200);}
+  else{_lsSet(HIST_KEY,JSON.stringify(h));}
+};
+function _loadHistUI(){
+  // delHist は Firebase sync で既に更新済み
+}
+
+// ── ローカルモード ───────────────────────────
+function fbRunLocalMode(){
+  document.getElementById('fb-setup-modal').style.display='none';
+  fbShowStatus('💾 ローカル保存モード（同期なし）');
+  // localStorage から読み込み
   function safeLoad(key,fallback){
-    const raw=_lsGet(key);
-    if(!raw)return fallback;
-    try{const d=JSON.parse(raw);return Array.isArray(d)?d:fallback;}
-    catch(e){console.warn('parse error for key',key,e);return fallback;}
+    const raw=_lsGet(key);if(!raw)return fallback;
+    try{const d=JSON.parse(raw);return Array.isArray(d)?d:fallback;}catch(e){return fallback;}
   }
-  cons=safeLoad(SK,[]);
-  lib =safeLoad(LK,[]);
-  schs=safeLoad(SCHK,[]);
-  // venueCap はオブジェクト形式
-  (function(){
-    const raw=_lsGet(VCAP_KEY);
-    if(raw){try{const d=JSON.parse(raw);if(d&&typeof d==='object'&&!Array.isArray(d))venueCap=d;}catch(e){}}
-  })();
+  cons=safeLoad(SK,[]);lib=safeLoad(LK,[]);schs=safeLoad(SCHK,[]);
+  (function(){const raw=_lsGet(VCAP_KEY);if(raw){try{const d=JSON.parse(raw);if(d&&typeof d==='object'&&!Array.isArray(d))venueCap=d;}catch(e){}}})();
+  // 旧キーマイグレーション
+  if(!cons.length){['cw_v2','cw_v1','sl_v4'].forEach(k=>{try{const raw=_lsGet(k);if(!raw)return;const d=JSON.parse(raw);if(Array.isArray(d)&&d.length){cons=d.map(mgC);saveC();}}catch(e){}});}
+  if(!schs.length){['cw_sched_v1','cw_schedule_v1'].forEach(k=>{try{const raw=_lsGet(k);if(!raw)return;const d=JSON.parse(raw);if(Array.isArray(d)&&d.length){schs=d;saveS();}}catch(e){}});}
+  _autoCleanSchs();
+  try{const r=_lsGet(HIST_KEY);if(r)delHist=JSON.parse(r)||[];}catch(e){}
+  clrF();rUChips('lib-uc',libUSel);rSongs();updB();
+}
 
-  // ── 旧キーからマイグレーション ──────────────
-  if(!cons.length){
-    ['cw_v2','cw_v1','sl_v4'].forEach(k=>{
-      try{
-        const raw=_lsGet(k);if(!raw)return;
-        const d=JSON.parse(raw);
-        if(Array.isArray(d)&&d.length){cons=d.map(mgC);saveC();}
-      }catch(e){}
-    });
-  }
-  if(!schs.length){
-    ['cw_sched_v1','cw_schedule_v1'].forEach(k=>{
-      try{
-        const raw=_lsGet(k);if(!raw)return;
-        const d=JSON.parse(raw);
-        if(Array.isArray(d)&&d.length){schs=d;saveS();}
-      }catch(e){}
-    });
-  }
+// ── スケジュール自動クリーン ─────────────────
+function _autoCleanSchs(){
+  const now=tod();
+  const ids=new Set(schs.filter(s=>{
+    if(!s.date)return false;
+    const d=new Date(s.date);d.setHours(0,0,0,0);
+    const cut=new Date(d);cut.setDate(cut.getDate()+1);
+    return cut<now;
+  }).map(s=>s.id));
+  if(ids.size){schs=schs.filter(s=>!ids.has(s.id));saveS();}
+}
 
-  // ── スケジュール自動クリーン ─────────────────
-  (function autoCleanSchs(){
-    const now=tod();
-    const ids=new Set(schs.filter(s=>{
-      if(!s.date)return false;
-      const d=new Date(s.date);d.setHours(0,0,0,0);
-      const cut=new Date(d);cut.setDate(cut.getDate()+1);
-      return cut<now;
-    }).map(s=>s.id));
-    if(ids.size){schs=schs.filter(s=>!ids.has(s.id));saveS();}
-  })();
+// ── 削除履歴ロード（overrideして空実装に） ───
+window._loadHist=function(){};// Firebase sync が管理
 
-  // ── 削除履歴ロード ──────────────────────────
-  _loadHist();
+// ── Firebase 設定モーダルを sidebar に追加 ───
+(function addFbSettingBtn(){
+  document.addEventListener('DOMContentLoaded',()=>{
+    const sbbot=document.querySelector('.sb-bot');
+    if(!sbbot)return;
+    const btn=document.createElement('button');
+    btn.className='sbbtn';
+    btn.innerHTML='<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.22 3.22l1.42 1.42M11.36 11.36l1.42 1.42M3.22 12.78l1.42-1.42M11.36 4.64l1.42-1.42"/></svg>Firebase設定';
+    btn.onclick=()=>{
+      reqAdmin(()=>{
+        const cfg=fbLoadConfig();if(cfg)fbFillSetupForm(cfg);
+        document.getElementById('fb-setup-modal').style.display='flex';
+      });
+    };
+    sbbot.insertBefore(btn,sbbot.firstChild);
+  });
+})();
 
-  // ── 画面初期化 ───────────────────────────────
-  clrF();
-  rUChips('lib-uc',libUSel);
-  rSongs();
-  updB();
+// ═══════════════════════════════════════════
+// INIT — 全関数定義の後でデータ読み込み・起動
+// ═══════════════════════════════════════════
+(function(){
+  // 画面の初期描画のため先にUI初期化
+  clrF();rUChips('lib-uc',libUSel);updB();
 
-  // ── localStorage 非対応時の警告バナー ────────
-  if(!avail){
-    const banner=document.createElement('div');
-    banner.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99999;background:#a02020;color:#fff;font-size:12px;padding:8px 16px;text-align:center;font-family:"Noto Sans JP",sans-serif;';
-    banner.textContent='⚠️ このブラウザではデータを保存できません（プライベートブラウジングまたは設定でCookieが無効になっています）';
-    document.body.appendChild(banner);
+  const savedCfg=fbLoadConfig();
+  if(savedCfg&&savedCfg.databaseURL){
+    // 保存済み設定で自動接続
+    document.getElementById('fb-setup-modal').style.display='none';
+    fbFillSetupForm(savedCfg);
+    fbShowStatus('🔥 Firebase に接続中...');
+    fbInit(savedCfg,false);
+  } else {
+    // 初回: 設定モーダルを表示
+    // （モーダルは既にdisplay:flexで表示済み）
   }
 })();
 </script>
 </body>
 </html>
+      
