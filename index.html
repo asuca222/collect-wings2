@@ -6,179 +6,6 @@
 <title>Collect Wings.</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Noto+Sans+JP:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-<!-- Firebase SDK -->
-<script type="module">
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged }
-  from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
-import { getDatabase, ref, set, onValue, off }
-  from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
-
-const firebaseConfig = {
-  apiKey: "AIzaSyCRhF2zTCpxjCz6oykjBs3kfP33elg236o",
-  authDomain: "collect-wings-4554a.firebaseapp.com",
-  databaseURL: "https://collect-wings-4554a-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "collect-wings-4554a",
-  storageBucket: "collect-wings-4554a.firebasestorage.app",
-  messagingSenderId: "742463033970",
-  appId: "1:742463033970:web:e4e13a7012f9260183e8eb"
-};
-
-const ADMIN_UID = 'PQMeeiqCw8biQSr5IiSmm7kTJkP2';
-const DB_PATH  = 'my-private-data/ifiwings';
-
-const app  = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db   = getDatabase(app);
-
-// ── Firebaseへの書き込みラッパー（UID検証付き） ──────────────────
-window._fbSet = async function(subPath, data) {
-  const user = auth.currentUser;
-  if (!user || user.uid !== ADMIN_UID) {
-    console.warn('[Firebase] Write blocked: not admin');
-    return false;
-  }
-  try {
-    await set(ref(db, DB_PATH + '/' + subPath), data);
-    return true;
-  } catch(e) {
-    console.error('[Firebase] Write error:', e);
-    return false;
-  }
-};
-
-// ── DB リアルタイム購読 ────────────────────────────────────────
-let _dbListenerRef = null;
-function startDbListener() {
-  if (_dbListenerRef) off(_dbListenerRef);
-  const r = ref(db, DB_PATH);
-  _dbListenerRef = r;
-  onValue(r, snap => {
-    const d = snap.val() || {};
-    const newCons  = Array.isArray(d.cons)  ? d.cons  : (d.cons  ? Object.values(d.cons)  : []);
-    const newLib   = Array.isArray(d.lib)   ? d.lib   : (d.lib   ? Object.values(d.lib)   : []);
-    const newSchs  = Array.isArray(d.schs)  ? d.schs  : (d.schs  ? Object.values(d.schs)  : []);
-    const newVcap  = (d.venueCap && typeof d.venueCap === 'object') ? d.venueCap : {};
-    const newHist  = Array.isArray(d.delHist) ? d.delHist : [];
-    // グローバル変数に反映
-    window.cons     = newCons.map(c => window.mgC ? window.mgC(c) : c);
-    window.lib      = newLib;
-    window.schs     = newSchs;
-    window.venueCap = newVcap;
-    window.delHist  = newHist;
-    // UI更新
-    if (window._cwReady) {
-      window.updB();
-      window.rCur();
-    }
-    // ローディング解除
-    const ld = document.getElementById('_fb-loading');
-    if (ld) ld.style.display = 'none';
-  }, err => {
-    console.error('[Firebase] Read error:', err);
-    const ld = document.getElementById('_fb-loading');
-    if (ld) { ld.textContent = '⚠ データ取得に失敗しました'; }
-  });
-}
-
-// ── 認証状態監視 ──────────────────────────────────────────────
-onAuthStateChanged(auth, user => {
-  const isAdmin = user && user.uid === ADMIN_UID;
-  window._isAdmin = isAdmin;
-  window._currentUser = user || null;
-
-  // 管理者UIの表示/非表示
-  applyAdminUI(isAdmin);
-
-  // ログインモーダルを閉じる
-  if (isAdmin) {
-    const m = document.getElementById('_login-modal');
-    if (m) m.style.display = 'none';
-    const err = document.getElementById('_login-err');
-    if (err) err.textContent = '';
-    // ログイン状態インジケーター更新
-    const ind = document.getElementById('_auth-indicator');
-    if (ind) { ind.textContent = '🔓 管理者'; ind.style.color = 'var(--gt)'; }
-    const logoutBtn = document.getElementById('_logout-btn');
-    if (logoutBtn) logoutBtn.style.display = 'flex';
-  } else {
-    const ind = document.getElementById('_auth-indicator');
-    if (ind) { ind.textContent = ''; }
-    const logoutBtn = document.getElementById('_logout-btn');
-    if (logoutBtn) logoutBtn.style.display = 'none';
-  }
-  // リアルタイム購読は常に開始（閲覧は全員OK）
-  startDbListener();
-});
-
-// ── ログイン処理 ──────────────────────────────────────────────
-window._fbLogin = async function() {
-  const email = document.getElementById('_login-email').value.trim();
-  const pass  = document.getElementById('_login-pass').value;
-  const err   = document.getElementById('_login-err');
-  if (!email || !pass) { err.textContent = 'メールとパスワードを入力してください'; return; }
-  try {
-    err.textContent = '認証中…';
-    const cred = await signInWithEmailAndPassword(auth, email, pass);
-    if (cred.user.uid !== ADMIN_UID) {
-      await signOut(auth);
-      err.textContent = '管理者権限がありません';
-    }
-  } catch(e) {
-    err.textContent = 'ログイン失敗: ' + (e.code || e.message);
-  }
-};
-
-// ── ログアウト ────────────────────────────────────────────────
-window._fbLogout = async function() {
-  await signOut(auth);
-};
-
-// ── 管理者UI表示切替 ─────────────────────────────────────────
-function applyAdminUI(isAdmin) {
-  // 管理者専用要素をまとめて表示/非表示
-  document.querySelectorAll('.admin-only').forEach(el => {
-    el.style.display = isAdmin ? '' : 'none';
-  });
-  // topbar の「公演を追加」ボタン
-  const topBtn = document.getElementById('topbar-btn');
-  if (topBtn) topBtn.style.display = isAdmin ? '' : 'none';
-  // サイドバーのlibリンク
-  const niLib = document.getElementById('ni-lib');
-  if (niLib) niLib.style.display = isAdmin ? '' : 'none';
-  // サイドバーのschedリンク
-  const niSched = document.getElementById('ni-sched');
-  if (niSched) niSched.style.display = isAdmin ? '' : 'none';
-  // 再描画が既に走っていればカードを再描画して編集/削除ボタン反映
-  if (window._cwReady) window.rCur();
-}
-
-// ── 隠しコマンド（koutarou1109）検知 ─────────────────────────
-(function() {
-  const TARGET = 'koutarou1109';
-  let buf = '';
-  let resetTimer = null;
-  document.addEventListener('keydown', e => {
-    // フォーム入力中は無視
-    const tag = (e.target.tagName || '').toLowerCase();
-    if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
-    buf += e.key;
-    if (!TARGET.startsWith(buf)) buf = e.key; // ミスしたらリセット
-    clearTimeout(resetTimer);
-    resetTimer = setTimeout(() => { buf = ''; }, 2000); // 2秒無入力でリセット
-    if (buf === TARGET) {
-      buf = '';
-      const m = document.getElementById('_login-modal');
-      if (m) {
-        m.style.display = m.style.display === 'none' ? 'flex' : 'none';
-        if (m.style.display === 'flex') {
-          setTimeout(() => { const em = document.getElementById('_login-email'); if(em) em.focus(); }, 50);
-        }
-      }
-    }
-  });
-})();
-</script>
 <style>
 :root[data-theme="dark"]{
   --bg:#0a0a0c;--bg2:#111114;--bg3:#18181d;--bg4:#22222a;
@@ -506,31 +333,6 @@ nav{padding:6px 0;flex:1;}
 .toggle-pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border:1px solid var(--line2);border-radius:999px;font-size:11px;color:var(--text2);cursor:pointer;user-select:none;transition:all .15s;}
 .toggle-pill.on{border-color:var(--accent2);color:var(--accent);background:var(--abg);}
 
-/* ── Firebase Loading Overlay ── */
-#_fb-loading{position:fixed;inset:0;z-index:99998;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;}
-#_fb-loading .fl-logo{font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:.15em;color:var(--accent);}
-#_fb-loading .fl-sub{font-size:11px;color:var(--text3);letter-spacing:.18em;font-family:'DM Mono',monospace;}
-.fl-spinner{width:28px;height:28px;border:2px solid var(--line2);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;}
-@keyframes spin{to{transform:rotate(360deg);}}
-
-/* ── Hidden Login Modal ── */
-#_login-modal{display:none;position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.65);align-items:center;justify-content:center;}
-.lm-box{background:var(--bg2);border:1px solid var(--line2);border-radius:14px;padding:24px 28px;width:min(360px,90vw);display:flex;flex-direction:column;gap:10px;}
-.lm-title{font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:.12em;color:var(--accent);margin-bottom:2px;}
-.lm-inp{width:100%;padding:8px 10px;font-size:13px;background:var(--ibg);border:1px solid var(--line2);border-radius:7px;color:var(--text);font-family:'Noto Sans JP',sans-serif;outline:none;transition:border .15s;}
-.lm-inp:focus{border-color:var(--accent2);}
-.lm-inp::placeholder{color:var(--text3);}
-.lm-err{font-size:11px;color:var(--rt);min-height:14px;}
-.lm-row{display:flex;gap:7px;}
-.lm-btn{flex:1;padding:8px;font-size:12px;border-radius:7px;border:1px solid var(--line2);background:transparent;color:var(--text2);cursor:pointer;font-family:'Noto Sans JP',sans-serif;transition:all .15s;}
-.lm-btn:hover{background:var(--bg3);color:var(--text);}
-.lm-btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;}
-.lm-btn.primary:hover{opacity:.85;}
-
-/* ── Auth indicator / logout ── */
-#_auth-indicator{font-size:10px;font-family:'DM Mono',monospace;padding:2px 14px 4px;letter-spacing:.08em;}
-#_logout-btn{display:none;}
-
 @media(max-width:720px){
   .sb{transform:translateX(-100%);width:250px;}
   .sbo{display:block;}
@@ -548,28 +350,6 @@ nav{padding:6px 0;flex:1;}
 </head>
 <body>
 <button class="hbg" onclick="tgMob()"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4h12M2 8h12M2 12h12"/></svg></button>
-
-<!-- Firebase Loading Overlay -->
-<div id="_fb-loading">
-  <div class="fl-logo">Collect Wings<span style="color:rgba(200,169,110,.4)">.</span></div>
-  <div class="fl-spinner"></div>
-  <div class="fl-sub">LOADING DATA…</div>
-</div>
-
-<!-- Hidden Login Modal (隠しコマンドで出現) -->
-<div id="_login-modal">
-  <div class="lm-box">
-    <div class="lm-title">管理者ログイン</div>
-    <input class="lm-inp" id="_login-email" type="email" placeholder="メールアドレス" autocomplete="username">
-    <input class="lm-inp" id="_login-pass" type="password" placeholder="パスワード" autocomplete="current-password"
-      onkeydown="if(event.key==='Enter')window._fbLogin()">
-    <div class="lm-err" id="_login-err"></div>
-    <div class="lm-row">
-      <button class="lm-btn" onclick="document.getElementById('_login-modal').style.display='none'">キャンセル</button>
-      <button class="lm-btn primary" onclick="window._fbLogin()">ログイン</button>
-    </div>
-  </div>
-</div>
 <div class="sbo" id="sbo" onclick="clMob()"></div>
 <aside class="sb" id="sb">
   <div class="logo">
@@ -591,8 +371,6 @@ nav{padding:6px 0;flex:1;}
     <!-- 公演を追加はトップバーボタンのみ -->
   </nav>
   <div class="sb-bot">
-    <div id="_auth-indicator"></div>
-    <button class="sbbtn" id="_logout-btn" onclick="window._fbLogout()"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M6 8h7M11 5l3 3-3 3"/><path d="M10 3H3a1 1 0 00-1 1v8a1 1 0 001 1h7"/></svg>ログアウト</button>
     <button class="sbbtn" onclick="sw('tips')"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="6.5"/><path d="M8 7v5M8 5v.5"/></svg>Tips</button>
     <button class="sbbtn" id="cm-btn" onclick="tgCast()"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="5" r="3"/><path d="M2 14c0-3.3 2.7-6 6-6s6 2.7 6 6"/></svg><span id="cm-lbl">キャスト名表示</span></button>
     <button class="tbtn" onclick="openSettings()" style="margin-bottom:2px;"><svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.22 3.22l1.42 1.42M11.36 11.36l1.42 1.42M3.22 12.78l1.42-1.42M11.36 4.64l1.42-1.42"/></svg>⚙ Settings</button>
@@ -612,7 +390,7 @@ nav{padding:6px 0;flex:1;}
 <main class="main">
   <div class="topbar">
     <div class="ptitle" id="ptitle">楽曲から検索</div>
-    <button class="btn btn-a btn-sm admin-only" id="topbar-btn" onclick="sw('add')">＋ 公演を追加</button>
+    <button class="btn btn-a btn-sm" id="topbar-btn" onclick="sw('add')">＋ 公演を追加</button>
   </div>
   <div class="content">
 
@@ -677,7 +455,7 @@ nav{padding:6px 0;flex:1;}
 
     <!-- LIBRARY -->
     <div class="panel" id="panel-lib">
-      <div class="fcard admin-only">
+      <div class="fcard">
         <div class="fst">楽曲を登録</div>
         <div class="fg">
           <div class="ff"><label>楽曲名 *</label><input id="lib-n" type="text" placeholder="楽曲名"></div>
@@ -700,7 +478,7 @@ nav{padding:6px 0;flex:1;}
     <!-- SCHEDULE -->
     <div class="panel" id="panel-sched">
       <div class="metrics" id="sched-met"></div>
-      <div class="fcard admin-only">
+      <div class="fcard">
         <div class="fst">スケジュールを追加</div>
         <div class="fg">
           <div class="ff"><label>公演名 *</label><input id="sc-n" type="text" placeholder="例：ARIA TOUR 2025"></div>
@@ -726,7 +504,7 @@ nav{padding:6px 0;flex:1;}
               <div class="ff"><label>開演時間</label><div class="dw"><input class="dp" id="f-th" inputmode="numeric" maxlength="2" placeholder="HH" style="width:32px;" oninput="slide('f-th','f-tm',2)"><span class="dsep">:</span><input class="dp" id="f-tm" inputmode="numeric" maxlength="2" placeholder="MM" style="width:32px;"></div></div>
               <div class="ff"><label>会場</label><input id="f-v" type="text" placeholder="例：日本武道館"></div>
               <div class="ff"><label>場所</label><input id="f-loc" type="text" placeholder="例：東京"></div>
-              <div class="ff"><label>種別タグ</label><input id="f-tag" type="text" placeholder="例：day1, day2"></div>
+              <div class="ff"><label>種別タグ</label><input id="f-tag" type="text" placeholder="例：day1"></div>
               <div class="ff"><label>短縮名（出欠一覧ヘッダー用）</label><input id="f-sn" type="text" placeholder="例：1st, 2nd"></div>
             </div>
             <div class="fst">出演形態</div>
@@ -742,9 +520,9 @@ nav{padding:6px 0;flex:1;}
           </div>
 
           <div class="fcard">
-            <div class="fst">セクション（Day1/Day2など）</div>
-            <div class="ftbar" id="ftbar"></div>
-            <div style="display:flex;gap:5px;margin-bottom:9px;">
+            <div class="fst" style="display:none;">セクション（Day1/Day2など）</div>
+            <div class="ftbar" id="ftbar" style="display:none;"></div>
+            <div style="display:none;gap:5px;margin-bottom:9px;">
               <input type="text" id="nti" placeholder="タブ名（例: Day1）" style="flex:1;padding:5px 8px;font-size:12px;background:var(--ibg);border:1px solid var(--line2);border-radius:6px;color:var(--text);font-family:'Noto Sans JP',sans-serif;outline:none;" onfocus="this.style.borderColor='var(--accent2)'" onblur="this.style.borderColor=''">
               <button class="btn btn-sm" onclick="addFT()">＋タブ</button>
             </div>
@@ -797,11 +575,36 @@ nav{padding:6px 0;flex:1;}
   </div>
 </main>
 
-<!-- Settings Modal (削除履歴) -->
+<!-- Settings Modal -->
 <div class="settings-modal" id="settings-modal" onclick="if(event.target===this)closeSettings()">
-  <div class="settings-box">
-    <div class="settings-hdr"><span class="settings-hdr-t">⚙ Settings — 削除履歴</span><button class="settings-close" onclick="closeSettings()">✕</button></div>
+  <div class="settings-box" style="max-width:520px;">
+    <div class="settings-hdr">
+      <span class="settings-hdr-t">⚙ Settings</span>
+      <button class="settings-close" onclick="closeSettings()">✕</button>
+    </div>
+    <!-- タブ -->
+    <div style="display:flex;border-bottom:1px solid var(--line);flex-shrink:0;">
+      <button id="stab-hist" onclick="sSettings('hist')" style="flex:1;padding:8px 6px;font-size:11px;background:transparent;border:none;border-bottom:2px solid var(--accent);color:var(--accent);cursor:pointer;font-family:'Noto Sans JP',sans-serif;transition:all .15s;">削除履歴</button>
+      <button id="stab-imp" onclick="sSettings('imp')" style="flex:1;padding:8px 6px;font-size:11px;background:transparent;border:none;border-bottom:2px solid transparent;color:var(--text2);cursor:pointer;font-family:'Noto Sans JP',sans-serif;transition:all .15s;">データ移植</button>
+    </div>
     <div class="settings-body" id="settings-body"></div>
+    <div class="settings-body" id="settings-imp-body" style="display:none;">
+      <div style="font-size:11px;color:var(--text3);margin-bottom:10px;line-height:1.7;">
+        旧サイト（asuca222.github.io/collect-wings-dead）のブラウザで<br>
+        <b style="color:var(--accent);">F12</b> → Console タブを開き、下のコマンドを実行してコピーしてください。
+      </div>
+      <div style="background:var(--bg3);border:1px solid var(--line2);border-radius:6px;padding:8px 10px;font-family:'DM Mono',monospace;font-size:10px;color:var(--ct);margin-bottom:12px;user-select:all;cursor:pointer;" onclick="this.style.outline='1px solid var(--accent)';navigator.clipboard?.writeText(this.textContent);" title="クリックでコピー">JSON.stringify({cons:JSON.parse(localStorage.getItem('cw_v3')||'[]'),lib:JSON.parse(localStorage.getItem('cw_lib_v1')||'[]'),vcap:JSON.parse(localStorage.getItem('cw_vcap_v1')||'null')})</div>
+      <div style="font-size:10px;color:var(--text3);margin-bottom:5px;">↓ コピーした結果をここに貼り付け</div>
+      <textarea id="imp-json" style="width:100%;min-height:110px;padding:7px 9px;font-size:11px;background:var(--ibg);border:1px solid var(--line2);border-radius:6px;color:var(--text);font-family:'DM Mono',monospace;outline:none;resize:vertical;" placeholder='{"cons":[...],"lib":[...]}'></textarea>
+      <div style="display:flex;gap:7px;align-items:center;margin-top:9px;flex-wrap:wrap;">
+        <button class="btn btn-a" onclick="doImport()">インポート実行</button>
+        <span id="imp-msg" style="font-size:11px;"></span>
+      </div>
+      <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--line);">
+        <div style="font-size:10px;color:var(--text3);margin-bottom:7px;">または — 現在のデータをJSONでエクスポート（バックアップ用）</div>
+        <button class="btn btn-sm" onclick="doExport()">📥 エクスポート</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -992,8 +795,6 @@ function clMob(){document.getElementById('sb').classList.remove('mo');document.g
 const ATS=['songs','cons','cast','xr','att','stat','lib','sched','add','tips'];
 const PT={songs:'楽曲から検索',cons:'公演一覧',cast:'キャスト公演',xr:'XR公演',att:'出欠一覧',stat:'統計',lib:'楽曲を追加',sched:'スケジュール',add:'公演を追加',tips:'Tips'};
 function sw(t){
-  // 管理者専用タブをブロック
-  if(!window._isAdmin && (t==='add'||t==='lib'||t==='sched')){return;}
   // warn if bulk textarea has unsaved content
   if(curTab==='add'&&t!=='add'){
     const bi=document.getElementById('bi');
@@ -1120,8 +921,11 @@ function rCCard(c,q){
   let tabsH='';
   const pm=c.perfMode||'cast';
   if(!tabs.length){tabsH='<div class="es" style="padding:14px;">楽曲なし</div>';}
-  else if(tabs.length===1){tabsH=`<div class="ptc on">${rSLR(tabs[0].songs,q,pm)}</div>`;}
-  else{const bar=tabs.map((t,i)=>`<button class="ptbtn${i===0?' on':''}" onclick="swtCT('${id}',${i})">${hl(t.name,q)}</button>`).join('');const cont=tabs.map((t,i)=>`<div class="ptc${i===0?' on':''}">${rSLR(t.songs,q,pm)}</div>`).join('');tabsH=`<div class="ptbar">${bar}</div>${cont}`;}
+  else{
+    // タブ機能を廃止: 全セクションの楽曲を連結して表示
+    const allSongs=tabs.flatMap(t=>t.songs||[]);
+    tabsH=`<div class="ptc on">${rSLR(allSongs,q,pm)}</div>`;
+  }
 
   // Costume display
   const costH=rCostDisplay(c);
@@ -1135,8 +939,8 @@ function rCCard(c,q){
         <div class="ccast" id="${id}-ccast" style="display:none;"></div>
       </div>
       <div style="display:flex;align-items:center;gap:4px;">
-        <button class="btn btn-sm admin-only" onclick="event.stopPropagation();editCon('${c.id}')">編集</button>
-        <button class="btn btn-sm btn-d admin-only" onclick="event.stopPropagation();delCon('${c.id}')">削除</button>
+        <button class="btn btn-sm" onclick="event.stopPropagation();editCon('${c.id}')">編集</button>
+        <button class="btn btn-sm btn-d" onclick="event.stopPropagation();delCon('${c.id}')">削除</button>
         <svg class="exp-ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 6l4 4 4-4"/></svg>
       </div>
     </div>
@@ -1437,7 +1241,10 @@ function parseTags(tagStr){
 const ORDINAL_RE=/\d+(?:st|nd|rd|th)/i;
 function isAnniv(c){
   const sn=(c.shortName||'').toLowerCase();
-  return ORDINAL_RE.test(sn);
+  if(ORDINAL_RE.test(sn))return true;
+  // tagsにも序数が含まれていればanniv扱い
+  const tags=parseTags(c.tags||'');
+  return tags.some(t=>ORDINAL_RE.test(t.toLowerCase()));
 }
 function rAtt(){
   let castCons=cons.filter(c=>c.perfMode==='cast');
@@ -1514,7 +1321,7 @@ function rAtt(){
 const VCAP_KEY='cw_vcap_v1';
 let venueCap={};
 // venueCap の読み込みは INIT ブロック内の _lsGet が使えるタイミングで行う
-// venueCap の保存は INIT ブロック内の saveVCap (Firebase) で行う
+function saveVCap(){if(typeof _lsSet==='function')_lsSet(VCAP_KEY,JSON.stringify(venueCap));}
 
 // チップ表示モード: 'unit'|'individual'|'all'
 let chipMode='unit';
@@ -1728,8 +1535,8 @@ function rLib(){
           <div style="font-size:11px;color:var(--text3);margin-top:2px;">${us}${e.cd?' ― '+e.cd:''}</div>
         </div>
         <div style="display:flex;gap:4px;flex-shrink:0;">
-          <button class="btn btn-sm admin-only" onclick="startLibEdit('${e.id}')">編集</button>
-          <button class="btn btn-sm btn-d admin-only" onclick="delLib('${e.id}')">削除</button>
+          <button class="btn btn-sm" onclick="startLibEdit('${e.id}')">編集</button>
+          <button class="btn btn-sm btn-d" onclick="delLib('${e.id}')">削除</button>
         </div>
       </div>
     </div>`;
@@ -1750,7 +1557,6 @@ function startLibEdit(id){
   document.getElementById('lib-n').focus();
 }
 function saveLib(){
-  if(!window._isAdmin){return;}
   const nm=document.getElementById('lib-n').value.trim(),msg=document.getElementById('lib-msg');
   if(!nm){msg.className='fm fer';msg.textContent='楽曲名は必須です';return;}
   // ソロ選択時は libSoloMbr を freeU として保存
@@ -1780,7 +1586,7 @@ function saveLib(){
   setTimeout(()=>msg.textContent='',1200);
   updB();rLib();
 }
-function delLib(id){if(!window._isAdmin)return;if(!confirm('削除しますか？'))return;const _li=lib.find(e=>e.id===id);if(_li)_pushHist('lib',{..._li});lib=lib.filter(e=>e.id!==id);if(editingLibId===id){editingLibId=null;document.getElementById('lib-msg').textContent='';}saveL();updB();rLib();}
+function delLib(id){if(!confirm('削除しますか？'))return;const _li=lib.find(e=>e.id===id);if(_li)_pushHist('lib',{..._li});lib=lib.filter(e=>e.id!==id);if(editingLibId===id){editingLibId=null;document.getElementById('lib-msg').textContent='';}saveL();updB();rLib();}
 
 // ═══════════════════════════════════════════
 // SCHEDULE
@@ -1799,9 +1605,9 @@ function rSched(){
     if(d===0){cls='ct2';lb='今日';}else if(d<0){cls='cf';lb=Math.abs(d)+'日後';}
     // show "公演に追加" button for past/today events not yet in cons
     const alreadyAdded=cons.some(c=>c.fromSchedId===s.id);
-    const addBtn=(!alreadyAdded&&d>=0)?`<button class="btn btn-sm btn-a admin-only" onclick="schedToCon('${s.id}')" style="font-size:10px;margin-top:3px;">公演に追加</button>`:'';
+    const addBtn=(!alreadyAdded&&d>=0)?`<button class="btn btn-sm btn-a" onclick="schedToCon('${s.id}')" style="font-size:10px;margin-top:3px;">公演に追加</button>`:'';
     if(alreadyAdded&&d>=0)lb+=' ✓';
-    return`<div class="scrd"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:7px;"><div><div style="font-size:13px;font-weight:500;">${s.name}</div><div style="font-size:11px;color:var(--text3);margin-top:2px;">${s.venue||''}${s.tags?' ['+s.tags+']':''}</div>${addBtn}</div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;"><span style="font-size:10px;color:var(--text3);font-family:'DM Mono',monospace;">${s.date}</span><span class="db ${cls}">${lb}</span><button class="btn btn-sm btn-d admin-only" onclick="delSch('${s.id}')">削除</button></div></div></div>`;
+    return`<div class="scrd"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:7px;"><div><div style="font-size:13px;font-weight:500;">${s.name}</div><div style="font-size:11px;color:var(--text3);margin-top:2px;">${s.venue||''}${s.tags?' ['+s.tags+']':''}</div>${addBtn}</div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;"><span style="font-size:10px;color:var(--text3);font-family:'DM Mono',monospace;">${s.date}</span><span class="db ${cls}">${lb}</span><button class="btn btn-sm btn-d" onclick="delSch('${s.id}')">削除</button></div></div></div>`;
   }
   let h='';
   if(tds.length)h+=`<div class="slbl3" style="color:var(--gt);">TODAY</div>`+tds.map(sc).join('');
@@ -1809,8 +1615,8 @@ function rSched(){
   if(past.length)h+=`<div class="slbl3" style="margin-top:9px;">PAST</div>`+past.map(sc).join('');
   el.innerHTML=h;
 }
-function saveSched(){if(!window._isAdmin)return;const nm=document.getElementById('sc-n').value.trim(),dt=gdate('sc-yy','sc-mm','sc-dd'),msg=document.getElementById('sc-msg');if(!nm||!dt){msg.className='fm fer';msg.textContent='公演名と日付は必須です';return;}schs.push({id:Date.now().toString(),name:nm,date:dt,venue:document.getElementById('sc-v').value.trim(),tags:document.getElementById('sc-tag').value.trim()});saveS();['sc-n','sc-v','sc-tag','sc-yy','sc-mm','sc-dd'].forEach(id=>document.getElementById(id).value='');msg.className='fm fok';msg.textContent='追加しました！';setTimeout(()=>{msg.textContent='';rSched();},500);updB();}
-function delSch(id){if(!window._isAdmin)return;if(!confirm('削除しますか？'))return;const _si=schs.find(s=>s.id===id);if(_si)_pushHist('sched',{..._si});schs=schs.filter(s=>s.id!==id);saveS();rSched();updB();}
+function saveSched(){const nm=document.getElementById('sc-n').value.trim(),dt=gdate('sc-yy','sc-mm','sc-dd'),msg=document.getElementById('sc-msg');if(!nm||!dt){msg.className='fm fer';msg.textContent='公演名と日付は必須です';return;}schs.push({id:Date.now().toString(),name:nm,date:dt,venue:document.getElementById('sc-v').value.trim(),tags:document.getElementById('sc-tag').value.trim()});saveS();['sc-n','sc-v','sc-tag','sc-yy','sc-mm','sc-dd'].forEach(id=>document.getElementById(id).value='');msg.className='fm fok';msg.textContent='追加しました！';setTimeout(()=>{msg.textContent='';rSched();},500);updB();}
+function delSch(id){if(!confirm('削除しますか？'))return;const _si=schs.find(s=>s.id===id);if(_si)_pushHist('sched',{..._si});schs=schs.filter(s=>s.id!==id);saveS();rSched();updB();}
 // Convert schedule to concert — 内容を維持したまま公演一覧に移植
 function schedToCon(schId){
   const s=schs.find(x=>x.id===schId);if(!s)return;
@@ -1995,7 +1801,6 @@ function clrF(){
   const ca=document.getElementById('cost-arr');if(ca)ca.style.transform='';
 }
 function saveCon(){
-  if(!window._isAdmin){alert('管理者のみ操作できます');return;}
   const nm=document.getElementById('f-n').value.trim(),dt=gdate('f-yy','f-mm','f-dd'),msg=document.getElementById('f-msg');
   if(!nm||!dt){msg.className='fm fer';msg.textContent='公演名と日付は必須です';return;}
   // auto-import bulk textarea if not yet reflected
@@ -2065,14 +1870,56 @@ function editCon(id){
 // ─── 削除履歴 ──────────────────────────────────────────────────
 const HIST_KEY='cw_hist_v1';
 let delHist=[];
-function _loadHist(){/* Firebaseリアルタイム購読で自動ロード */}
-function _pushHist(type,item){
-  if(!window._isAdmin)return;
-  delHist.unshift({type,item,ts:new Date().toISOString()});
-  window._saveHist&&window._saveHist();
+function _loadHist(){try{const r=_lsGet(HIST_KEY);if(r)delHist=JSON.parse(r)||[];}catch(e){}}
+function _saveHist(){try{_lsSet(HIST_KEY,JSON.stringify(delHist.slice(0,300)));}catch(e){}}
+function _pushHist(type,item){delHist.unshift({type,item,ts:new Date().toISOString()});_saveHist();}
+function sSettings(tab){
+  ['hist','imp'].forEach(t=>{
+    const btn=document.getElementById('stab-'+t);
+    if(btn){btn.style.borderBottom=t===tab?'2px solid var(--accent)':'2px solid transparent';btn.style.color=t===tab?'var(--accent)':'var(--text2)';}
+  });
+  document.getElementById('settings-body').style.display=tab==='hist'?'':'none';
+  document.getElementById('settings-imp-body').style.display=tab==='imp'?'':'none';
 }
-function openSettings(){rSettings();document.getElementById('settings-modal').classList.add('open');}
+function openSettings(){_loadHist();rSettings();document.getElementById('settings-modal').classList.add('open');sSettings('hist');}
 function closeSettings(){document.getElementById('settings-modal').classList.remove('open');}
+function doImport(){
+  const raw=document.getElementById('imp-json').value.trim();
+  const msg=document.getElementById('imp-msg');
+  if(!raw){msg.style.color='var(--rt)';msg.textContent='JSONを貼り付けてください';return;}
+  let data;
+  try{data=JSON.parse(raw);}catch(e){msg.style.color='var(--rt)';msg.textContent='JSONの形式が正しくありません';return;}
+  // cons
+  let addedC=0,skipC=0;
+  const inCons=Array.isArray(data.cons)?data.cons:Array.isArray(data)?data:[];
+  inCons.forEach(raw=>{
+    const c=mgC({...raw});
+    if(cons.some(x=>x.id===c.id||(x.name===c.name&&x.date===c.date))){skipC++;return;}
+    cons.push(c);addedC++;
+  });
+  // lib
+  let addedL=0,skipL=0;
+  const inLib=Array.isArray(data.lib)?data.lib:[];
+  inLib.forEach(e=>{
+    if(lib.some(x=>n(x.name)===n(e.name||''))){skipL++;return;}
+    lib.push({id:e.id||('imp'+Date.now()+Math.random().toString(36).slice(2)),name:e.name||'',cd:e.cd||'',units:e.units||[]});addedL++;
+  });
+  // vcap
+  if(data.vcap&&typeof data.vcap==='object'&&!Array.isArray(data.vcap)){
+    Object.entries(data.vcap).forEach(([k,v])=>{if(!venueCap[k])venueCap[k]=v;});
+    saveVCap();
+  }
+  if(addedC>0)saveC();
+  if(addedL>0)saveL();
+  updB();rCur();
+  msg.style.color='var(--gt)';
+  msg.textContent=`完了！ 公演+${addedC}件（スキップ${skipC}）, 楽曲+${addedL}件（スキップ${skipL}）`;
+  document.getElementById('imp-json').value='';
+}
+function doExport(){
+  const blob=new Blob([JSON.stringify({cons,lib,vcap:venueCap},null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='collect-wings-backup.json';a.click();
+}
 function rSettings(){
   const el=document.getElementById('settings-body');if(!el)return;
   if(!delHist.length){el.innerHTML='<div class="es" style="padding:28px 10px;">削除履歴はありません</div>';return;}
@@ -2082,83 +1929,137 @@ function rSettings(){
     const ds=`${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
     const nm=e.item.name||'(名称なし)';
     const sub=e.type==='con'?((e.item.date||'')+(e.item.venue?' ／ '+e.item.venue:'')):e.type==='lib'?(e.item.cd||''):(e.item.date||'');
-    const restoreBtn=window._isAdmin?`<button class="btn btn-sm" onclick="restoreHist(${i})" style="flex-shrink:0;white-space:nowrap;">↩ 復活</button>`:'';
-    return`<div class="hist-row"><div class="hist-info"><div class="hist-name"><span class="hist-type">${tl[e.type]||e.type}</span>${nm}</div>${sub?`<div class="hist-meta">${sub}</div>`:''}<div class="hist-meta">${ds}に削除</div></div>${restoreBtn}</div>`;
+    return`<div class="hist-row"><div class="hist-info"><div class="hist-name"><span class="hist-type">${tl[e.type]||e.type}</span>${nm}</div>${sub?`<div class="hist-meta">${sub}</div>`:''}<div class="hist-meta">${ds}に削除</div></div><button class="btn btn-sm" onclick="restoreHist(${i})" style="flex-shrink:0;white-space:nowrap;">↩ 復活</button></div>`;
   }).join('');
 }
 function restoreHist(i){
-  if(!window._isAdmin)return;
   const e=delHist[i];if(!e)return;
   if(e.type==='con'){cons.push(e.item);saveC();}
   else if(e.type==='lib'){lib.push(e.item);saveL();}
   else if(e.type==='sched'){schs.push(e.item);saveS();}
-  delHist.splice(i,1);window._saveHist&&window._saveHist();rSettings();updB();rCur();
+  delHist.splice(i,1);_saveHist();rSettings();updB();rCur();
 }
 function delCon(id){
-  if(!window._isAdmin)return;
   if(!confirm('この公演データを削除してもよろしいですか？'))return;
   const idx=cons.findIndex(c=>c.id===id);
   if(idx>=0){_pushHist('con',{...cons[idx]});cons.splice(idx,1);saveC();rCons();updB();}
 }
 
 // ═══════════════════════════════════════════
-// INIT — Firebase ベース（localStorage廃止）
+// INIT — 全関数定義の後でデータ読み込み・起動
 // ═══════════════════════════════════════════
 (function(){
-  // ── saveトースト要素を body に注入 ────────────────────────────
+  // ── localStorage 可用性チェック ──────────────
+  let avail=false;
+  try{localStorage.setItem('_cw_test','1');localStorage.removeItem('_cw_test');avail=true;}catch(e){}
+  window._lsAvail=avail;
+
+  // ── 読み込みヘルパー ─────────────────────────
+  window._lsGet=function(key){
+    if(!avail)return null;
+    try{return localStorage.getItem(key);}catch(e){return null;}
+  };
+
+  // ── 書き込みヘルパー ─────────────────────────
+  window._lsSet=function(key,val){
+    if(!avail){
+      if(!document._noLsWarn){
+        document._noLsWarn=true;
+        console.warn('localStorage unavailable');
+      }
+      return false;
+    }
+    try{localStorage.setItem(key,val);return true;}
+    catch(e){
+      console.error('localStorage save error',key,e);
+      if(!document._saveWarnShown){
+        document._saveWarnShown=true;
+        setTimeout(()=>{document._saveWarnShown=false;},8000);
+        const t=document.getElementById('_save-toast');
+        if(t){t.style.background='rgba(163,45,45,.95)';t.style.color='#fff';t.textContent='⚠ 保存に失敗しました（容量不足の可能性があります）';t.style.opacity='1';setTimeout(()=>{t.style.opacity='0';},5000);}
+      }
+      return false;
+    }
+  };
+
+  // ── saveトースト要素を body に注入 ───────────
   const toast=document.createElement('div');
   toast.id='_save-toast';
   toast.style.cssText='position:fixed;bottom:16px;right:16px;z-index:9999;padding:7px 14px;border-radius:8px;font-size:11px;font-family:"Noto Sans JP",sans-serif;font-weight:500;pointer-events:none;transition:opacity .4s;opacity:0;';
   document.body.appendChild(toast);
 
-  // ── トースト表示ヘルパー ────────────────────────────────────
-  function showToast(msg,isErr){
-    const t=document.getElementById('_save-toast');if(!t)return;
-    clearTimeout(t._tid);
-    t.style.background=isErr?'rgba(163,45,45,.95)':'rgba(45,158,110,.92)';
-    t.style.color='#fff';t.textContent=msg;t.style.opacity='1';
-    t._tid=setTimeout(()=>{t.style.opacity='0';},isErr?4000:1400);
+  // ── save 関数定義 ────────────────────────────
+  window.saveC=function(){
+    const ok=_lsSet(SK,JSON.stringify(cons));
+    if(ok){const t=document.getElementById('_save-toast');if(t){clearTimeout(t._tid);t.style.background='rgba(45,158,110,.92)';t.style.color='#fff';t.textContent='✓ 保存しました';t.style.opacity='1';t._tid=setTimeout(()=>{t.style.opacity='0';},1400);}}
+  };
+  window.saveL=function(){_lsSet(LK,JSON.stringify(lib));};
+  window.saveS=function(){_lsSet(SCHK,JSON.stringify(schs));};
+
+  // ── データ読み込み ───────────────────────────
+  function safeLoad(key,fallback){
+    const raw=_lsGet(key);
+    if(!raw)return fallback;
+    try{const d=JSON.parse(raw);return Array.isArray(d)?d:fallback;}
+    catch(e){console.warn('parse error for key',key,e);return fallback;}
+  }
+  cons=safeLoad(SK,[]);
+  lib =safeLoad(LK,[]);
+  schs=safeLoad(SCHK,[]);
+  // venueCap はオブジェクト形式
+  (function(){
+    const raw=_lsGet(VCAP_KEY);
+    if(raw){try{const d=JSON.parse(raw);if(d&&typeof d==='object'&&!Array.isArray(d))venueCap=d;}catch(e){}}
+  })();
+
+  // ── 旧キーからマイグレーション ──────────────
+  if(!cons.length){
+    ['cw_v2','cw_v1','sl_v4'].forEach(k=>{
+      try{
+        const raw=_lsGet(k);if(!raw)return;
+        const d=JSON.parse(raw);
+        if(Array.isArray(d)&&d.length){cons=d.map(mgC);saveC();}
+      }catch(e){}
+    });
+  }
+  if(!schs.length){
+    ['cw_sched_v1','cw_schedule_v1'].forEach(k=>{
+      try{
+        const raw=_lsGet(k);if(!raw)return;
+        const d=JSON.parse(raw);
+        if(Array.isArray(d)&&d.length){schs=d;saveS();}
+      }catch(e){}
+    });
   }
 
-  // ── Firebase書き込み + トースト ──────────────────────────────
-  window.saveC=async function(){
-    if(!window._isAdmin){showToast('⚠ 管理者のみ保存できます',true);return;}
-    const ok=await window._fbSet('cons',window.cons);
-    if(ok)showToast('✓ 保存しました');
-    else showToast('⚠ 保存に失敗しました',true);
-  };
-  window.saveL=async function(){
-    if(!window._isAdmin)return;
-    await window._fbSet('lib',window.lib);
-  };
-  window.saveS=async function(){
-    if(!window._isAdmin)return;
-    await window._fbSet('schs',window.schs);
-  };
-  window.saveVCap=async function(){
-    if(!window._isAdmin)return;
-    await window._fbSet('venueCap',window.venueCap);
-  };
-  window._saveHist=async function(){
-    if(!window._isAdmin)return;
-    await window._fbSet('delHist',window.delHist.slice(0,300));
-  };
+  // ── スケジュール自動クリーン ─────────────────
+  (function autoCleanSchs(){
+    const now=tod();
+    const ids=new Set(schs.filter(s=>{
+      if(!s.date)return false;
+      const d=new Date(s.date);d.setHours(0,0,0,0);
+      const cut=new Date(d);cut.setDate(cut.getDate()+1);
+      return cut<now;
+    }).map(s=>s.id));
+    if(ids.size){schs=schs.filter(s=>!ids.has(s.id));saveS();}
+  })();
 
-  // ── 削除履歴（グローバルで宣言済み変数を参照） ──────────────
-  window._loadHist=function(){/* Firebaseから自動ロード済 */};
+  // ── 削除履歴ロード ──────────────────────────
+  _loadHist();
 
-  // ── 画面初期化（データはFirebaseから非同期に入る） ──────────
-  window.cons=[];window.lib=[];window.schs=[];
-  window.venueCap={};window.delHist=[];
-
-  // テーマ復元（localStorage は theme と UI設定のみ継続使用）
-  try{const t=localStorage.getItem('cw_theme');if(t){document.documentElement.setAttribute('data-theme',t);document.getElementById('tl').textContent=t==='light'?'ダークモード':'ライトモード';}}catch(e){}
-
+  // ── 画面初期化 ───────────────────────────────
   clrF();
   rUChips('lib-uc',libUSel);
   rSongs();
   updB();
-  window._cwReady=true;
+
+  // ── localStorage 非対応時の警告バナー ────────
+  if(!avail){
+    const banner=document.createElement('div');
+    banner.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99999;background:#a02020;color:#fff;font-size:12px;padding:8px 16px;text-align:center;font-family:"Noto Sans JP",sans-serif;';
+    banner.textContent='⚠️ このブラウザではデータを保存できません（プライベートブラウジングまたは設定でCookieが無効になっています）';
+    document.body.appendChild(banner);
+  }
 })();
 </script>
 </body>
