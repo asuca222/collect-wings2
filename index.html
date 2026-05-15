@@ -365,7 +365,6 @@ nav{padding:6px 0;flex:1;}
     <div class="ni" id="ni-xr" onclick="sw('xr')"><svg class="nico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="1" y="5" width="14" height="8" rx="2"/><circle cx="5.5" cy="9" r="1.5"/><path d="M10 9h3M10 11.5h2"/></svg>XR公演</div>
     <div class="ns">管理</div>
     <div class="ni" id="ni-att" onclick="sw('att')"><svg class="nico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="1" y="2" width="14" height="12" rx="1.5"/><path d="M5 6h6M5 9h4M5 12h3"/></svg>出欠一覧</div>
-    <div class="ni" id="ni-stat" onclick="sw('stat')"><svg class="nico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2 12V8h3v4H2zM6.5 12V5h3v7h-3zM11 12V2h3v10h-3z"/></svg>統計</div>
     <div class="ni" id="ni-lib" onclick="sw('lib')"><svg class="nico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2 2h5v12H2zM9 2h5v12H9z"/></svg>楽曲を追加<span class="nbadge" id="b-lib">0</span></div>
     <div class="ni" id="ni-sched" onclick="sw('sched')"><svg class="nico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2" y="2" width="12" height="12" rx="1.5"/><path d="M5 1v2M11 1v2M2 6h12"/></svg>スケジュール<span class="nbadge" id="b-sched">0</span></div>
     <!-- 公演を追加はトップバーボタンのみ -->
@@ -448,10 +447,6 @@ nav{padding:6px 0;flex:1;}
       <div class="att-wrap"><div id="att-table-wrap"></div></div>
     </div>
 
-    <!-- STATISTICS -->
-    <div class="panel" id="panel-stat">
-      <div id="stat-content"></div>
-    </div>
 
     <!-- LIBRARY -->
     <div class="panel" id="panel-lib">
@@ -608,19 +603,6 @@ nav{padding:6px 0;flex:1;}
   </div>
 </div>
 
-<!-- Vcap Modal (会場キャパ設定) -->
-<div class="settings-modal" id="vcap-modal" onclick="if(event.target===this)closeVcapModal()">
-  <div class="settings-box" style="max-width:420px;">
-    <div class="settings-hdr"><span class="settings-hdr-t">⚙ 会場キャパシティ設定</span><button class="settings-close" onclick="closeVcapModal()">✕</button></div>
-    <div class="settings-body" id="vcap-modal-body">
-      <p style="font-size:11px;color:var(--text3);margin-bottom:10px;">公演に紐づいた会場ごとにキャパ数を設定します。</p>
-      <div id="vcap-modal-rows"></div>
-    </div>
-    <div style="padding:12px 18px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;">
-      <button class="btn btn-a" onclick="closeVcapModal()">確定</button>
-    </div>
-  </div>
-</div>
 
 <script>
 // ═══════════════════════════════════════════
@@ -792,8 +774,8 @@ function clMob(){document.getElementById('sb').classList.remove('mo');document.g
 // ═══════════════════════════════════════════
 // TAB SWITCHING
 // ═══════════════════════════════════════════
-const ATS=['songs','cons','cast','xr','att','stat','lib','sched','add','tips'];
-const PT={songs:'楽曲から検索',cons:'公演一覧',cast:'キャスト公演',xr:'XR公演',att:'出欠一覧',stat:'統計',lib:'楽曲を追加',sched:'スケジュール',add:'公演を追加',tips:'Tips'};
+const ATS=['songs','cons','cast','xr','att','lib','sched','add','tips'];
+const PT={songs:'楽曲から検索',cons:'公演一覧',cast:'キャスト公演',xr:'XR公演',att:'出欠一覧',lib:'楽曲を追加',sched:'スケジュール',add:'公演を追加',tips:'Tips'};
 function sw(t){
   // warn if bulk textarea has unsaved content
   if(curTab==='add'&&t!=='add'){
@@ -816,7 +798,7 @@ function sw(t){
   }
   clMob();rCur();
 }
-function rCur(){if(curTab==='songs')rSongs();else if(curTab==='cons')rCons();else if(curTab==='cast')rPP('cast');else if(curTab==='xr')rPP('xr');else if(curTab==='att')rAtt();else if(curTab==='stat')rStat();else if(curTab==='lib')rLib();else if(curTab==='sched')rSched();else if(curTab==='tips')rTips();updB();}
+function rCur(){if(curTab==='songs')rSongs();else if(curTab==='cons')rCons();else if(curTab==='cast')rPP('cast');else if(curTab==='xr')rPP('xr');else if(curTab==='att')rAtt();else if(curTab==='lib')rLib();else if(curTab==='sched')rSched();else if(curTab==='tips')rTips();updB();}
 function updB(){document.getElementById('b-songs').textContent=Object.keys(bSM()).length;document.getElementById('b-cons').textContent=cons.length;document.getElementById('b-lib').textContent=lib.length;document.getElementById('b-sched').textContent=schs.length;}
 
 // ═══════════════════════════════════════════
@@ -890,12 +872,12 @@ function libLook(name){const k=n(name);return lib.find(e=>n(e.name)===k);}
 // CAST SUMMARY (expanded cards)
 // ═══════════════════════════════════════════
 function cSum(c){
-  // Returns array of {name, color, unitColor}
+  // Returns array of {name, color, unitColor} — MBR配列順（イルミネ→…→コメティック）
   const res=[];const seen=new Set();
-  Object.entries(c.castPresent||{}).forEach(([ch,v])=>{
-    if(!v)return;
-    const m=MBR.find(x=>x.ch===ch);
-    if(m&&!seen.has(ch)){seen.add(ch);res.push({name:mname(m),color:m.c,unitColor:UNITS.find(x=>x.id===m.u)?.color||'#888'});}
+  const cp=c.castPresent||{};
+  MBR.filter(m=>m.u!=='other').forEach(m=>{
+    if(!cp[m.ch])return;
+    if(!seen.has(m.ch)){seen.add(m.ch);res.push({name:mname(m),color:m.c,unitColor:UNITS.find(x=>x.id===m.u)?.color||'#888'});}
   });
   if(!res.length){// fallback from setlist unit labels
     const unitsSeen=new Set();
@@ -1318,160 +1300,7 @@ function rAtt(){
 // ═══════════════════════════════════════════
 // STATISTICS
 // ═══════════════════════════════════════════
-const VCAP_KEY='cw_vcap_v1';
-let venueCap={};
-// venueCap の読み込みは INIT ブロック内の _lsGet が使えるタイミングで行う
-function saveVCap(){if(typeof _lsSet==='function')_lsSet(VCAP_KEY,JSON.stringify(venueCap));}
 
-// チップ表示モード: 'unit'|'individual'|'all'
-let chipMode='unit';
-
-// ── 歯車モーダル (会場キャパ設定) ─────────────────────────
-function openVcapModal(){
-  const venueList=[...new Set(cons.map(c=>c.venue||'').filter(Boolean))].sort();
-  const el=document.getElementById('vcap-modal-body');
-  if(!el)return;
-  if(!venueList.length){el.innerHTML='<div style="font-size:12px;color:var(--text3);padding:8px 0;">公演データに会場が登録されていません</div>';document.getElementById('vcap-modal').classList.add('open');return;}
-  el.innerHTML=venueList.map(v=>`
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
-      <span style="font-size:12px;flex:1;color:var(--text);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${v}">${v}</span>
-      <input type="number" min="0" placeholder="人数" value="${venueCap[v]||''}"
-        style="width:100px;padding:5px 8px;font-size:12px;background:var(--ibg);border:1px solid var(--line2);border-radius:6px;color:var(--text);font-family:'DM Mono',monospace;outline:none;"
-        oninput="venueCap[${JSON.stringify(v)}]=(this.value?parseInt(this.value):0);saveVCap();"
-        onfocus="this.style.borderColor='var(--accent2)'" onblur="this.style.borderColor=''">
-    </div>`).join('');
-  document.getElementById('vcap-modal').classList.add('open');
-}
-function closeVcapModal(){document.getElementById('vcap-modal').classList.remove('open');rStat();}
-
-function rCapGraph(data){
-  const W=700,H=240,PL=64,PR=24,PT=24,PB=64;
-  const iW=W-PL-PR,iH=H-PT-PB;
-  const maxCap=Math.max(...data.map(x=>x.cap));
-  const minCap=Math.min(...data.map(x=>x.cap));
-  const range=maxCap-minCap||maxCap||1;
-  const baseMin=minCap>0?Math.max(0,minCap-range*0.15):0;
-  const n=data.length;
-  const bw=Math.max(6,Math.min(44,Math.floor(iW/n*0.6)));
-  const slot=iW/n;
-  const isDark=document.documentElement.getAttribute('data-theme')==='dark';
-  const textCol=isDark?'#80808c':'#4a6a8a';
-  const gridCol=isDark?'rgba(255,255,255,.07)':'rgba(0,80,180,.09)';
-  const barCol=isDark?'#c8a96e':'#0060c0';
-  const barHi=isDark?'#f0d090':'#3d90f5';
-  const fmtN=v=>v>=10000?(v/10000).toFixed(1)+'万':v>=1000?(v/1000).toFixed(0)+'k':String(v);
-  // Y軸ティック
-  const ticks=4;
-  let svg=`<svg viewBox="0 0 ${W} ${H}" width="100%" style="min-width:${Math.max(280,n*42)}px;max-height:280px;display:block;overflow:visible;">`;
-  for(let i=0;i<=ticks;i++){
-    const val=baseMin+(maxCap-baseMin)/ticks*i;
-    const y=PT+iH-((val-baseMin)/(maxCap-baseMin||1))*iH;
-    svg+=`<line x1="${PL}" x2="${PL+iW}" y1="${y.toFixed(1)}" y2="${y.toFixed(1)}" stroke="${gridCol}" stroke-dasharray="3,3"/>`;
-    svg+=`<text x="${PL-6}" y="${(y+4).toFixed(1)}" text-anchor="end" font-size="9" fill="${textCol}" font-family="'DM Mono',monospace">${fmtN(Math.round(val))}</text>`;
-  }
-  svg+=`<line x1="${PL}" x2="${PL}" y1="${PT}" y2="${PT+iH}" stroke="${textCol}" stroke-width="1"/>`;
-  svg+=`<line x1="${PL}" x2="${PL+iW}" y1="${PT+iH}" y2="${PT+iH}" stroke="${textCol}" stroke-width="1"/>`;
-  data.forEach((d,i)=>{
-    const cx=PL+slot*i+slot/2;
-    const bh=Math.max(3,((d.cap-baseMin)/(maxCap-baseMin||1))*iH);
-    const bx=cx-bw/2, by=PT+iH-bh;
-    const isMax=d.cap===maxCap;
-    svg+=`<rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${bw}" height="${bh.toFixed(1)}" rx="3" fill="${isMax?barHi:barCol}" opacity=".88"><title>${d.name}: ${d.cap.toLocaleString()}人</title></rect>`;
-    if(bh>16)svg+=`<text x="${cx.toFixed(1)}" y="${(by-4).toFixed(1)}" text-anchor="middle" font-size="9" fill="${isDark?'#e6e6ea':'#0c1e38'}" font-family="'DM Mono',monospace">${fmtN(d.cap)}</text>`;
-    const nm=d.name.length>9?d.name.slice(0,8)+'…':d.name;
-    const lx=cx, ly=PT+iH+10;
-    svg+=`<text x="${lx.toFixed(1)}" y="${ly}" text-anchor="end" transform="rotate(-40,${lx.toFixed(1)},${ly})" font-size="9" fill="${textCol}" font-family="'Noto Sans JP',sans-serif">${nm}</text>`;
-  });
-  svg+='</svg>';
-  return`<div style="overflow-x:auto;">${svg}</div>`;
-}
-
-function rStat(){
-  const el=document.getElementById('stat-content');
-  const totalSongs=Object.keys(bSM()).length;
-  const castConsAll=cons.filter(c=>c.perfMode==='cast');
-  const xrConsAll=cons.filter(c=>c.perfMode==='xr');
-  const perfSet=new Set();
-  cons.forEach(c=>Object.entries(c.castPresent||{}).forEach(([k,v])=>{if(v)perfSet.add(k);}));
-  const totalPerf=perfSet.size;
-  // 公演×キャパ (古い順)
-  const capByCon=[...cons]
-    .sort((a,b)=>a.date.localeCompare(b.date)||(a.startTime||'').localeCompare(b.startTime||''))
-    .map(c=>({name:c.shortName||c.name,cap:parseInt(venueCap[c.venue||'']||0),date:c.date}))
-    .filter(x=>x.cap>0);
-  const totalCap=capByCon.reduce((s,x)=>s+x.cap,0);
-  const chipHTML=rStatChips();
-  const graphH=capByCon.length>=2
-    ?rCapGraph(capByCon)
-    :`<div style="font-size:11px;color:var(--text3);padding:10px 0;">キャパシティが設定された公演が2件以上あるとグラフが表示されます</div>`;
-
-  el.innerHTML=`
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
-    <span style="font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:.08em;color:var(--text);">概要</span>
-    <button class="btn btn-sm" onclick="openVcapModal()" style="display:inline-flex;align-items:center;gap:5px;">
-      <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.22 3.22l1.42 1.42M11.36 11.36l1.42 1.42M3.22 12.78l1.42-1.42M11.36 4.64l1.42-1.42"/></svg>
-      会場キャパ設定
-    </button>
-  </div>
-  <div class="metrics" style="margin-bottom:16px;">
-    <div class="metric"><div class="ml">楽曲数</div><div class="mv def">${totalSongs}</div><div class="ms">曲</div></div>
-    <div class="metric"><div class="ml">出演者（ユニーク）</div><div class="mv def">${totalPerf}</div><div class="ms">名</div></div>
-    <div class="metric"><div class="ml">キャスト公演</div><div class="mv def">${castConsAll.length}</div><div class="ms">件</div></div>
-    <div class="metric"><div class="ml">XR公演</div><div class="mv def">${xrConsAll.length}</div><div class="ms">件</div></div>
-    ${totalCap>0?`<div class="metric"><div class="ml">総キャパシティ</div><div class="mv def">${totalCap.toLocaleString()}</div><div class="ms">名</div></div>`:''}
-  </div>
-  <div class="fcard" style="margin-bottom:14px;">
-    <div class="fst">公演キャパシティ推移</div>
-    ${graphH}
-  </div>
-  <div class="fcard">
-    <div class="fst">出演チップ表示</div>
-    <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;">
-      <button class="btn btn-sm${chipMode==='unit'?' btn-a':''}" onclick="setChipMode('unit')">ユニット単位</button>
-      <button class="btn btn-sm${chipMode==='individual'?' btn-a':''}" onclick="setChipMode('individual')">個別</button>
-      <button class="btn btn-sm${chipMode==='all'?' btn-a':''}" onclick="setChipMode('all')">全選択</button>
-    </div>
-    <div id="stat-chips" style="display:flex;flex-wrap:wrap;gap:5px;">${chipHTML}</div>
-  </div>`;
-}
-function setChipMode(m){chipMode=m;rStat();}
-function rStatChips(){
-  // 出演チップ: chipModeに応じて内容を変える
-  // unit: ユニット名のチップ（演者羅列なし）
-  // individual: 全キャラ/キャスト名
-  // all: ユニット＋その他を分けて表示
-  if(chipMode==='unit'){
-    return UORDER.map(uid=>{
-      const u=UNITS.find(x=>x.id===uid);if(!u)return'';
-      const ms=MBR.filter(m=>m.u===uid);
-      const names=ms.map(m=>showCast?m.ca:m.ch).join('・');
-      return`<span style="display:inline-flex;flex-direction:column;padding:5px 10px;border-radius:8px;border:1px solid ${u.color}44;background:${u.color}18;font-size:11px;cursor:default;gap:2px;">
-        <span style="color:${u.color};font-weight:500;">${u.short}</span>
-        <span style="font-size:9px;color:var(--text3);">${names}</span>
-      </span>`;
-    }).join('');
-  } else if(chipMode==='individual'){
-    return UORDER.map(uid=>{
-      const u=UNITS.find(x=>x.id===uid);if(!u)return'';
-      return MBR.filter(m=>m.u===uid).map(m=>`<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:999px;border:1px solid ${m.c}44;background:${m.c}18;font-size:11px;"><span style="width:6px;height:6px;border-radius:50%;background:${m.c};flex-shrink:0;"></span>${showCast?m.ca:m.ch}</span>`).join('');
-    }).join('');
-  } else {
-    // all: ユニット部分とその他部分を分離
-    const unitPart=UORDER.map(uid=>{
-      const u=UNITS.find(x=>x.id===uid);if(!u)return'';
-      const ms=MBR.filter(m=>m.u===uid);
-      const names=ms.map(m=>showCast?m.ca:m.ch).join('、');
-      return`<span style="display:inline-flex;flex-direction:column;padding:5px 10px;border-radius:8px;border:1px solid ${u.color}44;background:${u.color}18;font-size:11px;gap:2px;">
-        <span style="color:${u.color};font-weight:500;">${u.short}</span>
-        <span style="font-size:9px;color:var(--text3);">${names}</span>
-      </span>`;
-    }).join('');
-    const otherU=UNITS.find(x=>x.id==='other');
-    const otherPart=MBR.filter(m=>m.u==='other').map(m=>`<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:999px;border:1px solid var(--line2);background:var(--bg3);font-size:11px;">${showCast?m.ca:m.ch}</span>`).join('');
-    return`<div style="width:100%;margin-bottom:8px;">${unitPart}</div>
-      ${otherPart?`<div style="width:100%;padding-top:8px;border-top:1px solid var(--line);margin-top:4px;"><div style="font-size:9px;color:var(--text3);margin-bottom:5px;letter-spacing:.1em;">その他（ゲスト等）</div>${otherPart}</div>`:''}`;
-  }
-}
 function rUChips(cid,sel){
   const el=document.getElementById(cid);if(!el)return;
   // ライブラリ選択: 通常ユニット + all + other + solo + リフラク（独立）
@@ -2064,6 +1893,5 @@ function delCon(id){
   }
 })();
 </script>
-<script src="firebase-sync.js"></script>
 </body>
 </html>
